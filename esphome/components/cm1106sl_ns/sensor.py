@@ -31,9 +31,10 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
-    # Sensor principal CO2
+    # CO2 principal
     co2 = await sensor.new_sensor(
         {
+            CONF_ID: cg.declare_id(sensor.Sensor),
             CONF_NAME: config[CONF_NAME],
             "unit_of_measurement": UNIT_PARTS_PER_MILLION,
             "icon": ICON_MOLECULE_CO2,
@@ -42,21 +43,40 @@ async def to_code(config):
     )
     cg.add(var.co2_sensor, co2)
 
-    # Sensores secundarios (sin IDs configurables)
-    df3 = await sensor.new_sensor({CONF_NAME: f"{config[CONF_NAME]} DF3"})
-    df4 = await sensor.new_sensor({CONF_NAME: f"{config[CONF_NAME]} DF4"})
-    status = await text_sensor.new_text_sensor({CONF_NAME: f"{config[CONF_NAME]} Estado"})
-    stability = await sensor.new_sensor({CONF_NAME: f"{config[CONF_NAME]} Estabilidad"})
-    ready = await binary_sensor.new_binary_sensor({CONF_NAME: f"{config[CONF_NAME]} Listo"})
-    error = await binary_sensor.new_binary_sensor({CONF_NAME: f"{config[CONF_NAME]} Error"})
-    iaq_num = await sensor.new_sensor({CONF_NAME: f"{config[CONF_NAME]} IAQ (1-5)"})
-    iaq_txt = await text_sensor.new_text_sensor({CONF_NAME: f"{config[CONF_NAME]} IAQ Texto"})
-
+    # DF3 / DF4
+    df3 = await sensor.new_sensor({CONF_ID: cg.declare_id(sensor.Sensor), CONF_NAME: f"{config[CONF_NAME]} DF3"})
+    df4 = await sensor.new_sensor({CONF_ID: cg.declare_id(sensor.Sensor), CONF_NAME: f"{config[CONF_NAME]} DF4"})
     cg.add(var.df3_sensor, df3)
     cg.add(var.df4_sensor, df4)
+
+    # Estado (texto)
+    status = await text_sensor.new_text_sensor(
+        {CONF_ID: cg.declare_id(text_sensor.TextSensor), CONF_NAME: f"{config[CONF_NAME]} Estado"}
+    )
     cg.add(var.status_sensor, status)
+
+    # Estabilidad
+    stability = await sensor.new_sensor(
+        {CONF_ID: cg.declare_id(sensor.Sensor), CONF_NAME: f"{config[CONF_NAME]} Estabilidad"}
+    )
     cg.add(var.stability_sensor, stability)
+
+    # Listo / Error
+    ready = await binary_sensor.new_binary_sensor(
+        {CONF_ID: cg.declare_id(binary_sensor.BinarySensor), CONF_NAME: f"{config[CONF_NAME]} Listo"}
+    )
+    error = await binary_sensor.new_binary_sensor(
+        {CONF_ID: cg.declare_id(binary_sensor.BinarySensor), CONF_NAME: f"{config[CONF_NAME]} Error"}
+    )
     cg.add(var.ready_sensor, ready)
     cg.add(var.error_sensor, error)
+
+    # IAQ numérico + texto
+    iaq_num = await sensor.new_sensor(
+        {CONF_ID: cg.declare_id(sensor.Sensor), CONF_NAME: f"{config[CONF_NAME]} IAQ (1-5)"}
+    )
+    iaq_txt = await text_sensor.new_text_sensor(
+        {CONF_ID: cg.declare_id(text_sensor.TextSensor), CONF_NAME: f"{config[CONF_NAME]} IAQ Texto"}
+    )
     cg.add(var.iaq_numeric, iaq_num)
     cg.add(var.iaq_text, iaq_txt)
