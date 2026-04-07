@@ -1,1 +1,1 @@
-# Necesario para que ESPHome detecte el componente
+"""CM1106SL-NS component for ESPHome."""
