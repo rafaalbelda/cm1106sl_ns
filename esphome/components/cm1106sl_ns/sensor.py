@@ -22,8 +22,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(CM1106SLNS),
 
         # ID del sensor principal (obligatorio)
-        cv.Required(CONF_ID): cv.declare_id(sensor.Sensor),
-
+        #cv.Required(CONF_ID): cv.declare_id(sensor.Sensor),
+        cv.GenerateID(): cv.declare_id(CM1106SLNS),
         cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Required(CONF_NAME): cv.string,
     }
@@ -38,7 +38,7 @@ async def to_code(config):
     # Sensor principal CO2
     co2 = await sensor.new_sensor(
         {
-            CONF_ID: config[CONF_ID],
+            #CONF_ID: config[CONF_ID],
             CONF_NAME: config[CONF_NAME],
             "unit_of_measurement": UNIT_PARTS_PER_MILLION,
             "icon": ICON_MOLECULE_CO2,
