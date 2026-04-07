@@ -1,9 +1,6 @@
 #pragma once
 
-#include "esphome/core/component.h"
-#include "esphome/components/sensor/sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome.h"
 #include "esphome/components/uart/uart.h"
 
 namespace esphome {
@@ -50,3 +47,4 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
 
 }  // namespace cm1106sl_ns
 }  // namespace esphome
+
