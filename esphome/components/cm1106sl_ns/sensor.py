@@ -27,10 +27,6 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], await cg.get_variable(config[CONF_UART_ID]))
-    await cg.register_component(var, config)
-    await uart.register_uart_device(var, config)
-
     # CO2 principal
     co2 = await sensor.new_sensor(
         {
@@ -40,6 +36,10 @@ async def to_code(config):
             "icon": ICON_MOLECULE_CO2,
             "device_class": DEVICE_CLASS_CARBON_DIOXIDE,
         }
+    var = cg.new_Pvariable(config[CONF_ID], await cg.get_variable(config[CONF_UART_ID]))
+    await cg.register_component(var, config)
+    await uart.register_uart_device(var, config)
+
     )
     cg.add(var.co2_sensor, co2)
 
