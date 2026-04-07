@@ -42,15 +42,51 @@ CONFIG_SCHEMA = (
                 accuracy_decimals=0,
                 device_class=DEVICE_CLASS_CARBON_DIOXIDE,
                 state_class=STATE_CLASS_MEASUREMENT,
+            ).extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
             ),
-            cv.Optional(CONF_DF3): sensor.sensor_schema(),
-            cv.Optional(CONF_DF4): sensor.sensor_schema(),
-            cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema(),
-            cv.Optional(CONF_STABILITY): sensor.sensor_schema(),
-            cv.Optional(CONF_READY): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_IAQ_NUMERIC): sensor.sensor_schema(),
-            cv.Optional(CONF_IAQ_TEXT): text_sensor.text_sensor_schema(),
+            cv.Optional(CONF_DF3): sensor.sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
+            ),
+            cv.Optional(CONF_DF4): sensor.sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
+            ),
+            cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                }
+            ),
+            cv.Optional(CONF_STABILITY): sensor.sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
+            ),
+            cv.Optional(CONF_READY): binary_sensor.binary_sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
+                }
+            ),
+            cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
+                }
+            ),
+            cv.Optional(CONF_IAQ_NUMERIC): sensor.sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
+            ),
+            cv.Optional(CONF_IAQ_TEXT): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                }
+            ),
         },
     )
     .extend(cv.polling_component_schema("60s"))
