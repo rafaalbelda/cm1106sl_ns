@@ -19,7 +19,7 @@ CONF_UART_ID = "uart_id"
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(CONF_ID): cv.declare_id(CM1106SLNS),
+        cv.GenerateID(): cv.declare_id(CM1106SLNS),
         cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Required(CONF_NAME): cv.string,
     }
