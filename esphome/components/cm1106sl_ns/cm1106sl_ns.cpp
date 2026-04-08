@@ -10,9 +10,16 @@ static const char *const TAG = "cm1106sl_ns";
 
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
-  ESP_LOGI(TAG, "CM1106SL-NS sensor setup");
+  ESP_LOGI(TAG, "CM1106SL-NS sensor setup - START");
   this->last_frame_time_ = millis();
   this->config_cmd_time_ = millis();
+  
+  // Send config command immediately
+  ESP_LOGI(TAG, "Sending config command from setup...");
+  this->send_config_command_();
+  this->config_command_sent_ = true;
+  
+  ESP_LOGI(TAG, "CM1106SL-NS setup complete");
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -80,16 +87,9 @@ void CM1106SLNSComponent::soft_reset_() {
 void CM1106SLNSComponent::loop() {
   uint8_t buffer[8];
 
-  // Send config command on first loop iteration after setup delay
-  if (this->awaiting_config_response_ && !this->config_command_sent_ && (millis() - this->config_cmd_time_) > 150) {
-    ESP_LOGI(TAG, "Sending config command...");
-    this->send_config_command_();
-    this->config_command_sent_ = true;
-  }
-
-  // Handle config response if waiting
+  // Handle config response if waiting (command was sent in setup)
   if (this->awaiting_config_response_) {
-    ESP_LOGD(TAG, "Awaiting Config response");
+    ESP_LOGD(TAG, "Waiting for config response...");
     if (this->available() >= 4) {
       uint8_t response[4];
       for (int i = 0; i < 4; i++) {
