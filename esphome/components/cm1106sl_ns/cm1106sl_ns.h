@@ -24,6 +24,10 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   void set_iaq_numeric_sensor(sensor::Sensor *iaq_numeric) { this->iaq_numeric_ = iaq_numeric; }
   //void set_iaq_text_sensor(text_sensor::TextSensor *iaq_text) { this->iaq_text_ = iaq_text; }
   void set_debug_uart(bool debug) { this->debug_uart_ = debug; }
+  void set_measurement_period(uint32_t period) { this->measurement_period_ = period; }
+  void set_warmup_timeout(uint32_t timeout) { this->warmup_timeout_ = timeout; }
+  void set_config_period(uint16_t period_s) { this->config_period_s_ = period_s; }
+  void set_smoothing_samples(uint8_t samples) { this->smoothing_samples_ = samples; }
 
  protected:
   sensor::Sensor *co2_sensor_{nullptr};
@@ -43,9 +47,18 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   uint8_t bad_frames_ = 0;
   bool debug_uart_ = false;
   bool timeout_active_ = false;
+  uint32_t measurement_period_ = 15000;  // 15 seconds
+  uint32_t warmup_timeout_ = 60000;      // 60 seconds
+  uint16_t config_period_s_ = 4;         // config period in seconds (4-600s)
+  uint8_t smoothing_samples_ = 1;        // number of smoothed data points
+  bool awaiting_config_response_ = true;
+  uint32_t config_cmd_time_ = 0;
 
   std::string interpret_status_(uint8_t df3, uint8_t df4);
+  void send_config_command_();
+  bool validate_config_response_(const uint8_t *buffer, size_t len);
   bool validate_checksum_(const uint8_t *buffer, size_t len);
+  uint8_t calculate_checksum_(const uint8_t *buffer, size_t len);
   void publish_iaq_(uint16_t co2);
   void soft_reset_();
 };

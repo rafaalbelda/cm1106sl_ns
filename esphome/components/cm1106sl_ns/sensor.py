@@ -20,7 +20,7 @@ CODEOWNERS = ["@rafaalbelda"]
 
 cm1106sl_ns_ns = cg.esphome_ns.namespace("cm1106sl_ns")
 CM1106SLNSComponent = cm1106sl_ns_ns.class_(
-    "CM1106SLNSComponent", cg.PollingComponent, uart.UARTDevice
+    "CM1106SLNSComponent", cg.Component, uart.UARTDevice
 )
 
 CONF_DF3 = "df3"
@@ -32,6 +32,10 @@ CONF_ERROR = "error"
 CONF_IAQ_NUMERIC = "iaq_numeric"
 CONF_IAQ_TEXT = "iaq_text"
 CONF_DEBUG = "debug"
+CONF_MEASUREMENT_PERIOD = "measurement_period"
+CONF_WARMUP_TIMEOUT = "warmup_timeout"
+CONF_CONFIG_PERIOD = "config_period"
+CONF_SMOOTHING_SAMPLES = "smoothing_samples"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -89,6 +93,18 @@ CONFIG_SCHEMA = (
                 }
             ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+            cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.All(
+                cv.time_period_milliseconds, cv.Range(min=1000, max=60000)
+            ),
+            cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.All(
+                cv.time_period_milliseconds, cv.Range(min=5000, max=300000)
+            ),
+            cv.Optional(CONF_CONFIG_PERIOD, default=4): cv.All(
+                cv.positive_int, cv.Range(min=4, max=600)
+            ),
+            cv.Optional(CONF_SMOOTHING_SAMPLES, default=1): cv.All(
+                cv.positive_int, cv.Range(min=1, max=15)
+            ),
         },
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -139,3 +155,11 @@ async def to_code(config) -> None:
 
     # Debug flag for UART logging
     cg.add(var.set_debug_uart(config[CONF_DEBUG]))
+
+    # Measurement and warmup timeouts
+    cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
+    cg.add(var.set_warmup_timeout(config[CONF_WARMUP_TIMEOUT]))
+
+    # Sensor configuration (sent at startup)
+    cg.add(var.set_config_period(config[CONF_CONFIG_PERIOD]))
+    cg.add(var.set_smoothing_samples(config[CONF_SMOOTHING_SAMPLES]))

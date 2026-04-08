@@ -11,6 +11,11 @@ static const char *const TAG = "cm1106sl_ns";
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
   this->last_frame_time_ = millis();
+  
+  // Send configuration command with slight delay to ensure sensor is ready
+  delay(100);
+  this->config_cmd_time_ = millis();
+  this->send_config_command_();
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -32,6 +37,14 @@ bool CM1106SLNSComponent::validate_checksum_(const uint8_t *buffer, size_t len) 
   }
   uint8_t checksum = (~sum) + 1;
   return checksum == buffer[len - 1];
+}
+
+uint8_t CM1106SLNSComponent::calculate_checksum_(const uint8_t *buffer, size_t len) {
+  uint8_t sum = 0;
+  for (size_t i = 0; i < len; i++) {
+    sum += buffer[i];
+  }
+  return (~sum) + 1;
 }
 
 void CM1106SLNSComponent::publish_iaq_(uint16_t co2) {
@@ -70,10 +83,35 @@ void CM1106SLNSComponent::soft_reset_() {
 void CM1106SLNSComponent::loop() {
   uint8_t buffer[8];
 
-  // Check for timeout
-  if (millis() - this->last_frame_time_ > 15000) {
+  // Handle config response if waiting
+  if (this->awaiting_config_response_) {
+    if (this->available() >= 4) {
+      uint8_t response[4];
+      for (int i = 0; i < 4; i++) {
+        response[i] = this->read();
+      }
+      
+      if (this->validate_config_response_(response, 4)) {
+        ESP_LOGI(TAG, "Config command ACK received: 16 01 50 %02X", response[3]);
+        this->awaiting_config_response_ = false;
+      } else {
+        ESP_LOGW(TAG, "Invalid config response: %02X %02X %02X %02X", 
+                 response[0], response[1], response[2], response[3]);
+        // Clear UART buffer on invalid response
+        while (this->available() >= 1) {
+          this->read();
+        }
+      }
+    } else if (millis() - this->config_cmd_time_ > 2000) {
+      // Timeout waiting for config response
+      ESP_LOGW(TAG, "Config response timeout after 2s");
+      this->awaiting_config_response_ = false;
+    }
+    return;  // Don't process sensor data until config is done
+  }
+  if (millis() - this->last_frame_time_ > this->measurement_period_) {
     if (!this->timeout_active_) {
-      ESP_LOGW(TAG, "CM1106SLNS Timeout: no data received for >15s");
+      ESP_LOGW(TAG, "CM1106SLNS Timeout: no data received for >%ums", this->measurement_period_);
       if (this->error_sensor_ != nullptr)
         this->error_sensor_->publish_state(true);
       this->timeout_active_ = true;
@@ -147,7 +185,7 @@ void CM1106SLNSComponent::loop() {
       if (this->warmup_start_ == 0)
         this->warmup_start_ = millis();
 
-      if (millis() - this->warmup_start_ > 60000) {
+      if (millis() - this->warmup_start_ > this->warmup_timeout_) {
         this->soft_reset_();
         this->warmup_start_ = millis();
       }
@@ -192,8 +230,42 @@ void CM1106SLNSComponent::dump_config() {
   LOG_SENSOR(" ", "IAQ Numeric", this->iaq_numeric_);
   //LOG_TEXT_SENSOR(" ", "IAQ Text", this->iaq_text_);
   ESP_LOGCONFIG(TAG, "UART debug: %s", this->debug_uart_ ? "enabled" : "disabled");
+  ESP_LOGCONFIG(TAG, "Measurement period: %ums", this->measurement_period_);
+  ESP_LOGCONFIG(TAG, "Warmup timeout: %ums", this->warmup_timeout_);
+  ESP_LOGCONFIG(TAG, "Config period: %u seconds", this->config_period_s_);
+  ESP_LOGCONFIG(TAG, "Smoothing samples: %u", this->smoothing_samples_);
   ESP_LOGCONFIG(TAG, "Expected UART baud_rate: %u", 9600);
   this->check_uart_settings(9600);
+}
+
+void CM1106SLNSComponent::send_config_command_() {
+  // Command format: 11 04 50 [DF1] [DF2] [DF3] [CS]
+  // DF1 = period_s / 256
+  // DF2 = period_s % 256
+  // DF3 = smoothing_samples
+  
+  uint8_t df1 = this->config_period_s_ / 256;
+  uint8_t df2 = this->config_period_s_ % 256;
+  uint8_t df3 = this->smoothing_samples_;
+  
+  uint8_t cmd[7] = {0x11, 0x04, 0x50, df1, df2, df3, 0x00};
+  cmd[6] = this->calculate_checksum_(cmd, 6);
+  
+  ESP_LOGI(TAG, "Sending config command: period=%us, smoothing=%u", 
+           this->config_period_s_, this->smoothing_samples_);
+  ESP_LOGD(TAG, "Command: 11 04 50 %02X %02X %02X %02X", df1, df2, df3, cmd[6]);
+  
+  this->write_array(cmd, 7);
+}
+
+bool CM1106SLNSComponent::validate_config_response_(const uint8_t *buffer, size_t len) {
+  // Expected response: 16 01 50 [CS]
+  if (len != 4) return false;
+  if (buffer[0] != 0x16) return false;
+  if (buffer[1] != 0x01) return false;
+  if (buffer[2] != 0x50) return false;
+  
+  return this->validate_checksum_(buffer, len);
 }
 
 }  // namespace cm1106sl_ns
