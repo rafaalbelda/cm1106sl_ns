@@ -152,12 +152,12 @@ void CM1106SLNSComponent::dump_config() {
   LOG_SENSOR(" ", "CO2", this->co2_sensor_);
   LOG_SENSOR(" ", "DF3", this->df3_sensor_);
   LOG_SENSOR(" ", "DF4", this->df4_sensor_);
-  LOG_TEXT_SENSOR(" ", "Status", this->status_sensor_);
+  #LOG_TEXT_SENSOR(" ", "Status", this->status_sensor_);
   LOG_SENSOR(" ", "Stability", this->stability_sensor_);
   LOG_BINARY_SENSOR(" ", "Ready", this->ready_sensor_);
   LOG_BINARY_SENSOR(" ", "Error", this->error_sensor_);
   LOG_SENSOR(" ", "IAQ Numeric", this->iaq_numeric_);
-  LOG_TEXT_SENSOR(" ", "IAQ Text", this->iaq_text_);
+  #LOG_TEXT_SENSOR(" ", "IAQ Text", this->iaq_text_);
   this->check_uart_settings(9600);
 }
 
