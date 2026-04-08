@@ -10,6 +10,7 @@ static const char *const TAG = "cm1106sl_ns";
 
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
+  this->last_frame_time_ = millis();
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -71,9 +72,16 @@ void CM1106SLNSComponent::loop() {
 
   // Check for timeout
   if (millis() - this->last_frame_time_ > 15000) {
-    ESP_LOGD(TAG, "CM1106SLNS Timeout");
-    if (this->error_sensor_ != nullptr)
-      this->error_sensor_->publish_state(true);
+    if (!this->timeout_active_) {
+      ESP_LOGW(TAG, "CM1106SLNS Timeout: no data received for >15s");
+      if (this->error_sensor_ != nullptr)
+        this->error_sensor_->publish_state(true);
+      this->timeout_active_ = true;
+    }
+  } else {
+    if (this->timeout_active_) {
+      this->timeout_active_ = false;
+    }
   }
 
   while (this->available() >= 8) {
@@ -85,6 +93,9 @@ void CM1106SLNSComponent::loop() {
                buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
 
     this->last_frame_time_ = millis();
+    if (this->timeout_active_) {
+      this->timeout_active_ = false;
+    }
     if (this->error_sensor_ != nullptr)
       this->error_sensor_->publish_state(false);
 

@@ -42,6 +42,7 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   uint32_t warmup_start_ = 0;
   uint8_t bad_frames_ = 0;
   bool debug_uart_ = false;
+  bool timeout_active_ = false;
 
   std::string interpret_status_(uint8_t df3, uint8_t df4);
   bool validate_checksum_(const uint8_t *buffer, size_t len);
