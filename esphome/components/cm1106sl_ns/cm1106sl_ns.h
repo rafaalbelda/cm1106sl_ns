@@ -1,8 +1,10 @@
 #pragma once
 
 #include "esphome.h"
+#include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
 //#include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 
 namespace esphome {
@@ -53,6 +55,7 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool awaiting_config_response_ = true;
   uint32_t config_cmd_time_ = 0;
+  bool config_command_sent_ = false;
 
   std::string interpret_status_(uint8_t df3, uint8_t df4);
   void send_config_command_();

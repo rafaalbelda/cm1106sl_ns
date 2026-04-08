@@ -7,16 +7,13 @@ namespace esphome {
 namespace cm1106sl_ns {
 
 static const char *const TAG = "cm1106sl_ns";
+static const uint8_t C_M1106_CMD_SOFT_RESET[5] = {0x11, 0x03, 0x02, 0x00, 0xED};
 
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
-  ESP_LOGD(TAG, "CM1106SL-NS sensor setup");
+  ESP_LOGI(TAG, "CM1106SL-NS sensor setup");
   this->last_frame_time_ = millis();
-  
-  // Send configuration command with slight delay to ensure sensor is ready
-  delay(100);
   this->config_cmd_time_ = millis();
-  this->send_config_command_();
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -77,15 +74,23 @@ void CM1106SLNSComponent::publish_iaq_(uint16_t co2) {
 
 void CM1106SLNSComponent::soft_reset_() {
   ESP_LOGW(TAG, "Soft reset del sensor");
-  const uint8_t reset_cmd[5] = {0x11, 0x03, 0x02, 0x00, 0xED};
+  const uint8_t reset_cmd[5] = C_M1106_CMD_SOFT_RESET;
   this->write_array(reset_cmd, 5);
 }
 
 void CM1106SLNSComponent::loop() {
   uint8_t buffer[8];
 
+  // Send config command on first loop iteration after setup delay
+  if (this->awaiting_config_response_ && !this->config_command_sent_ && (millis() - this->config_cmd_time_) > 150) {
+    ESP_LOGI(TAG, "Sending config command...");
+    this->send_config_command_();
+    this->config_command_sent_ = true;
+  }
+
   // Handle config response if waiting
   if (this->awaiting_config_response_) {
+    ESP_LOGD(TAG, "Awaiting Config response");
     if (this->available() >= 4) {
       uint8_t response[4];
       for (int i = 0; i < 4; i++) {

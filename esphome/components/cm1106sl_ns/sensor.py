@@ -8,7 +8,6 @@ import esphome.config_validation as cv
 from esphome.const import (
     CONF_CO2,
     CONF_ID,
-    CONF_NAME,
     DEVICE_CLASS_CARBON_DIOXIDE,
     ICON_MOLECULE_CO2,
     STATE_CLASS_MEASUREMENT,
@@ -62,11 +61,11 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
                 }
             ),
-            cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema().extend(
-                {
-                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                }
-            ),
+            # cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema().extend(
+            #     {
+            #         cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+            #     }
+            # ),
             cv.Optional(CONF_STABILITY): sensor.sensor_schema().extend(
                 {
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
@@ -87,11 +86,11 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
                 }
             ),
-            cv.Optional(CONF_IAQ_TEXT): text_sensor.text_sensor_schema().extend(
-                {
-                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                }
-            ),
+            # cv.Optional(CONF_IAQ_TEXT): text_sensor.text_sensor_schema().extend(
+            #     {
+            #         cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+            #     }
+            # ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
@@ -125,9 +124,9 @@ async def to_code(config) -> None:
         sens = await sensor.new_sensor(df4_config)
         cg.add(var.set_df4_sensor(sens))
 
-    if status_config := config.get(CONF_STATUS):
-        sens = await text_sensor.new_text_sensor(status_config)
-        cg.add(var.set_status_sensor(sens))
+    # if status_config := config.get(CONF_STATUS):
+    #     sens = await text_sensor.new_text_sensor(status_config)
+    #     cg.add(var.set_status_sensor(sens))
 
     if stability_config := config.get(CONF_STABILITY):
         sens = await sensor.new_sensor(stability_config)
@@ -145,9 +144,9 @@ async def to_code(config) -> None:
         sens = await sensor.new_sensor(iaq_numeric_config)
         cg.add(var.set_iaq_numeric_sensor(sens))
 
-    if iaq_text_config := config.get(CONF_IAQ_TEXT):
-        sens = await text_sensor.new_text_sensor(iaq_text_config)
-        cg.add(var.set_iaq_text_sensor(sens))
+    # if iaq_text_config := config.get(CONF_IAQ_TEXT):
+    #     sens = await text_sensor.new_text_sensor(iaq_text_config)
+    #     cg.add(var.set_iaq_text_sensor(sens))
 
     # Debug flag for UART logging
     cg.add(var.set_debug_uart(config[CONF_DEBUG]))
