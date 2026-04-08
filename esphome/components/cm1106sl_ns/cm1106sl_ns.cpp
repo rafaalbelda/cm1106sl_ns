@@ -9,17 +9,14 @@ namespace cm1106sl_ns {
 static const char *const TAG = "cm1106sl_ns";
 
 void CM1106SLNSComponent::setup() {
-  ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
-  ESP_LOGI(TAG, "CM1106SL-NS sensor setup - START");
   this->last_frame_time_ = millis();
   this->config_cmd_time_ = millis();
   
-  // Send config command immediately
-  ESP_LOGI(TAG, "Sending config command from setup...");
-  this->send_config_command_();
-  this->config_command_sent_ = true;
+  // Ensure we wait for config response
+  this->awaiting_config_response_ = true;
   
-  ESP_LOGI(TAG, "CM1106SL-NS setup complete");
+  // Send config command immediately
+  this->send_config_command_();
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -89,7 +86,13 @@ void CM1106SLNSComponent::loop() {
 
   // Handle config response if waiting (command was sent in setup)
   if (this->awaiting_config_response_) {
-    ESP_LOGD(TAG, "Waiting for config response...");
+    // Log once at the start that we're waiting
+    static bool logged_waiting = false;
+    if (!logged_waiting) {
+      ESP_LOGW(TAG, ">>> WAITING FOR CONFIG RESPONSE (2s timeout)");
+      logged_waiting = true;
+    }
+    
     if (this->available() >= 4) {
       uint8_t response[4];
       for (int i = 0; i < 4; i++) {
@@ -97,10 +100,11 @@ void CM1106SLNSComponent::loop() {
       }
       
       if (this->validate_config_response_(response, 4)) {
-        ESP_LOGI(TAG, "Config command ACK received: 16 01 50 %02X", response[3]);
+        ESP_LOGI(TAG, "<<< CONFIG ACK RECEIVED: 16 01 50 %02X", response[3]);
         this->awaiting_config_response_ = false;
+        logged_waiting = false;
       } else {
-        ESP_LOGW(TAG, "Invalid config response: %02X %02X %02X %02X", 
+        ESP_LOGW(TAG, "<<< INVALID CONFIG RESPONSE: %02X %02X %02X %02X", 
                  response[0], response[1], response[2], response[3]);
         // Clear UART buffer on invalid response
         while (this->available() >= 1) {
@@ -109,11 +113,13 @@ void CM1106SLNSComponent::loop() {
       }
     } else if (millis() - this->config_cmd_time_ > 2000) {
       // Timeout waiting for config response
-      ESP_LOGW(TAG, "Config response timeout after 2s");
+      ESP_LOGW(TAG, "<<< CONFIG RESPONSE TIMEOUT (>2s, no data)");
       this->awaiting_config_response_ = false;
+      logged_waiting = false;
     }
     return;  // Don't process sensor data until config is done
   }
+  
   if (millis() - this->last_frame_time_ > this->measurement_period_) {
     if (!this->timeout_active_) {
       ESP_LOGW(TAG, "CM1106SLNS Timeout: no data received for >%ums", this->measurement_period_);
@@ -256,9 +262,8 @@ void CM1106SLNSComponent::send_config_command_() {
   uint8_t cmd[7] = {0x11, 0x04, 0x50, df1, df2, df3, 0x00};
   cmd[6] = this->calculate_checksum_(cmd, 6);
   
-  ESP_LOGI(TAG, "Sending config command: period=%us, smoothing=%u", 
+  ESP_LOGW(TAG, ">>> SENDING CONFIG COMMAND: period=%us, smoothing=%u", 
            this->config_period_s_, this->smoothing_samples_);
-  ESP_LOGD(TAG, "Command: 11 04 50 %02X %02X %02X %02X", df1, df2, df3, cmd[6]);
   
   this->write_array(cmd, 7);
 }
