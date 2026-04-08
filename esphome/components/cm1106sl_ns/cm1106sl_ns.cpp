@@ -79,11 +79,27 @@ void CM1106SLNSComponent::update() {
     for (int i = 0; i < 8; i++)
       buffer[i] = this->read();
 
+    if (this->debug_uart_)
+      ESP_LOGD(TAG, "UART frame received: %02X %02X %02X %02X %02X %02X %02X %02X",
+               buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
+
     this->last_frame_time_ = millis();
     if (this->error_sensor_ != nullptr)
       this->error_sensor_->publish_state(false);
 
     if (!this->validate_checksum_(buffer, 8)) {
+      // Log checksum details for debugging
+      if (this->debug_uart_) {
+        uint8_t sum = 0;
+        for (size_t i = 0; i < 7; i++) {
+          sum += buffer[i];
+        }
+        uint8_t expected = (~sum) + 1;
+        ESP_LOGW(TAG, "Invalid checksum: expected 0x%02X got 0x%02X (sum 0x%02X)", expected, buffer[7], sum);
+        ESP_LOGW(TAG, "Frame bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                 buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
+      }
+
       this->bad_frames_++;
       if (this->bad_frames_ > 5) {
         this->soft_reset_();
@@ -106,6 +122,10 @@ void CM1106SLNSComponent::update() {
     auto status = this->interpret_status_(df3, df4);
     // if (this->status_sensor_ != nullptr)
     //   this->status_sensor_->publish_state(status);
+
+    if (this->debug_uart_)
+      ESP_LOGD(TAG, "Parsed values: CO2=%u DF3=0x%02X DF4=0x%02X Status=%s", co2, df3, df4,
+               status.c_str());
 
     if (status == "Warming up") {
       if (this->ready_sensor_ != nullptr)
@@ -158,6 +178,8 @@ void CM1106SLNSComponent::dump_config() {
   LOG_BINARY_SENSOR(" ", "Error", this->error_sensor_);
   LOG_SENSOR(" ", "IAQ Numeric", this->iaq_numeric_);
   //LOG_TEXT_SENSOR(" ", "IAQ Text", this->iaq_text_);
+  ESP_LOGCONFIG(TAG, "UART debug: %s", this->debug_uart_ ? "enabled" : "disabled");
+  ESP_LOGCONFIG(TAG, "Expected UART baud_rate: %u", 9600);
   this->check_uart_settings(9600);
 }
 

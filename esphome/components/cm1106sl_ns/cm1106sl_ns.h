@@ -23,6 +23,7 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   void set_error_sensor(binary_sensor::BinarySensor *error_sensor) { this->error_sensor_ = error_sensor; }
   void set_iaq_numeric_sensor(sensor::Sensor *iaq_numeric) { this->iaq_numeric_ = iaq_numeric; }
   //void set_iaq_text_sensor(text_sensor::TextSensor *iaq_text) { this->iaq_text_ = iaq_text; }
+  void set_debug_uart(bool debug) { this->debug_uart_ = debug; }
 
  protected:
   sensor::Sensor *co2_sensor_{nullptr};
@@ -40,6 +41,7 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint32_t last_frame_time_ = 0;
   uint32_t warmup_start_ = 0;
   uint8_t bad_frames_ = 0;
+  bool debug_uart_ = false;
 
   std::string interpret_status_(uint8_t df3, uint8_t df4);
   bool validate_checksum_(const uint8_t *buffer, size_t len);

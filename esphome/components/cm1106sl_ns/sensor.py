@@ -31,6 +31,7 @@ CONF_READY = "ready"
 CONF_ERROR = "error"
 CONF_IAQ_NUMERIC = "iaq_numeric"
 CONF_IAQ_TEXT = "iaq_text"
+CONF_DEBUG = "debug"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -87,6 +88,7 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 }
             ),
+            cv.Optional(CONF_DEBUG, default=False): cv.boolean,
         },
     )
     .extend(cv.polling_component_schema("60s"))
@@ -135,3 +137,6 @@ async def to_code(config) -> None:
     if iaq_text_config := config.get(CONF_IAQ_TEXT):
         sens = await text_sensor.new_text_sensor(iaq_text_config)
         cg.add(var.set_iaq_text_sensor(sens))
+
+    # Debug flag for UART logging
+    cg.add(var.set_debug_uart(config[CONF_DEBUG]))
