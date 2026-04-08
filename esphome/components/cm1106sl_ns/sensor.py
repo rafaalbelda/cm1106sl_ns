@@ -91,7 +91,6 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
         },
     )
-    .extend(cv.polling_component_schema("60s"))
     .extend(uart.UART_DEVICE_SCHEMA)
 )
 

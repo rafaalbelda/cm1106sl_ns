@@ -8,10 +8,10 @@
 namespace esphome {
 namespace cm1106sl_ns {
 
-class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
+class CM1106SLNSComponent : public Component, public uart::UARTDevice {
  public:
   void setup() override;
-  void update() override;
+  void loop() override;
   void dump_config() override;
 
   void set_co2_sensor(sensor::Sensor *co2_sensor) { this->co2_sensor_ = co2_sensor; }

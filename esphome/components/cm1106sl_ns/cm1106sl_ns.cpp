@@ -66,7 +66,7 @@ void CM1106SLNSComponent::soft_reset_() {
   this->write_array(reset_cmd, 5);
 }
 
-void CM1106SLNSComponent::update() {
+void CM1106SLNSComponent::loop() {
   uint8_t buffer[8];
 
   // Check for timeout
