@@ -71,7 +71,7 @@ void CM1106SLNSComponent::loop() {
 
   // Check for timeout
   if (millis() - this->last_frame_time_ > 15000) {
-    ESP_LOGD(TAG, "Timeout: Status=%s", status.c_str());
+    ESP_LOGD(TAG, "CM1106SLNS Timeout");
     if (this->error_sensor_ != nullptr)
       this->error_sensor_->publish_state(true);
   }
