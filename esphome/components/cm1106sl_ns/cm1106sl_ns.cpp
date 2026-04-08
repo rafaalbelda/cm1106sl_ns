@@ -7,7 +7,6 @@ namespace esphome {
 namespace cm1106sl_ns {
 
 static const char *const TAG = "cm1106sl_ns";
-static const uint8_t C_M1106_CMD_SOFT_RESET[5] = {0x11, 0x03, 0x02, 0x00, 0xED};
 
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
@@ -74,7 +73,7 @@ void CM1106SLNSComponent::publish_iaq_(uint16_t co2) {
 
 void CM1106SLNSComponent::soft_reset_() {
   ESP_LOGW(TAG, "Soft reset del sensor");
-  const uint8_t reset_cmd[5] = C_M1106_CMD_SOFT_RESET;
+  const uint8_t reset_cmd[5] = {0x11, 0x03, 0x02, 0x00, 0xED};
   this->write_array(reset_cmd, 5);
 }
 
