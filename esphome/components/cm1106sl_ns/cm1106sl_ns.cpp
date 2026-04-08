@@ -10,6 +10,7 @@ static const char *const TAG = "cm1106sl_ns";
 
 void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS sensor setup");
+  ESP_LOGD(TAG, "CM1106SL-NS sensor setup");
   this->last_frame_time_ = millis();
   
   // Send configuration command with slight delay to ensure sensor is ready
