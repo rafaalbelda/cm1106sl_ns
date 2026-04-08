@@ -93,12 +93,8 @@ CONFIG_SCHEMA = (
                 }
             ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
-            cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.All(
-                cv.positive_time_period_milliseconds, cv.Range(min=1000, max=60000)
-            ),
-            cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.All(
-                cv.positive_time_period_milliseconds, cv.Range(min=5000, max=300000)
-            ),
+            cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_CONFIG_PERIOD, default=4): cv.All(
                 cv.positive_int, cv.Range(min=4, max=600)
             ),
