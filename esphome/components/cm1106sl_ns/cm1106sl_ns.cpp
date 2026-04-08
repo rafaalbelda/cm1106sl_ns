@@ -56,8 +56,8 @@ void CM1106SLNSComponent::publish_iaq_(uint16_t co2) {
 
   if (this->iaq_numeric_ != nullptr)
     this->iaq_numeric_->publish_state(iaq);
-  if (this->iaq_text_ != nullptr)
-    this->iaq_text_->publish_state(label);
+  // if (this->iaq_text_ != nullptr)
+  //   this->iaq_text_->publish_state(label);
 }
 
 void CM1106SLNSComponent::soft_reset_() {
@@ -104,8 +104,8 @@ void CM1106SLNSComponent::update() {
       this->df4_sensor_->publish_state(df4);
 
     auto status = this->interpret_status_(df3, df4);
-    if (this->status_sensor_ != nullptr)
-      this->status_sensor_->publish_state(status);
+    // if (this->status_sensor_ != nullptr)
+    //   this->status_sensor_->publish_state(status);
 
     if (status == "Warming up") {
       if (this->ready_sensor_ != nullptr)
