@@ -77,6 +77,7 @@ void CM1106SLNSComponent::loop() {
       if (this->error_sensor_ != nullptr)
         this->error_sensor_->publish_state(true);
       this->timeout_active_ = true;
+      this->last_frame_time_ = millis();
     }
   } else {
     if (this->timeout_active_) {
