@@ -42,11 +42,11 @@ bluetooth_proxy:
   active: true
 
 uart:
-  - id: uart_cm
-    rx_pin: 23
-    tx_pin: 5
-    baud_rate: 9600
-    debug:
+  # - id: uart_cm
+  #   rx_pin: 23
+  #   tx_pin: 5
+  #   baud_rate: 9600
+  #   debug:
   - id: uart_pm
     rx_pin: 16
     tx_pin: 17
@@ -59,43 +59,34 @@ i2c:
   scl: GPIO22
 
 sensor:
-  # - platform: cm1106
-  #   uart_id: uart_cm
-  #   co2:
-  #     name: CO2 Valu
-  #     id: my_co2
+  # CM1106SL-NS CO2 Sensor via I2C (Continuous Measurement Mode)
   - platform: cm1106sl_ns
     id: my_co2
-    uart_id: uart_cm
-    #name: "CM1106SL-NS"
     update_interval: 60s
+    debug: false
     
-  #   co2:
-  #     name: "CO2 Level"
+    co2:
+      name: "CO2 Concentration"
+      unit_of_measurement: "ppm"
+      icon: "mdi:molecule-co2"
     
-  #   df3:
-  #     name: "Sensor Status DF3"
+    stability:
+      name: "CO2 Stability"
     
-  #   df4:
-  #     name: "Sensor Status DF4"
-      
-  #   status:
-  #     name: "Sensor Status"
+    ready:
+      name: "CO2 Sensor Ready"
     
-  #   stability:
-  #     name: "Stability Counter"
+    error:
+      name: "CO2 Sensor Error"
     
-  #   ready:
-  #     name: "Sensor Ready"
+    iaq_numeric:
+      name: "Air Quality Index"
     
-  #   error:
-  #     name: "Sensor Error"
-    
-  #   iaq_numeric:
-  #     name: "IAQ Rating"
-    
-  #   iaq_text:
-  #     name: "IAQ Text"
+    # Optional sensors (uncomment to enable):
+    # df3:
+    #   name: "Sensor Status DF3"
+    # df4:
+    #   name: "Sensor Status DF4"
 
   - platform: bme280_i2c
     temperature:

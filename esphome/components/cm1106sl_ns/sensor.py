@@ -1,9 +1,7 @@
 """CM1106SL-NS Sensor component for ESPHome."""
 
-from esphome import automation
-from esphome.automation import maybe_simple_id
 import esphome.codegen as cg
-from esphome.components import sensor, text_sensor, binary_sensor, uart
+from esphome.components import sensor, binary_sensor, i2c
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_CO2,
@@ -14,12 +12,12 @@ from esphome.const import (
     UNIT_PARTS_PER_MILLION,
 )
 
-DEPENDENCIES = ["uart"]
+DEPENDENCIES = ["i2c"]
 CODEOWNERS = ["@rafaalbelda"]
 
 cm1106sl_ns_ns = cg.esphome_ns.namespace("cm1106sl_ns")
 CM1106SLNSComponent = cm1106sl_ns_ns.class_(
-    "CM1106SLNSComponent", cg.Component, uart.UARTDevice
+    "CM1106SLNSComponent", cg.Component, i2c.I2CDevice
 )
 
 CONF_DF3 = "df3"
@@ -102,7 +100,7 @@ CONFIG_SCHEMA = (
             ),
         },
     )
-    .extend(uart.UART_DEVICE_SCHEMA)
+    .extend(i2c.i2c_device_schema(0x5A))
 )
 
 
@@ -110,7 +108,7 @@ async def to_code(config) -> None:
     """Code generation entry point."""
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    await uart.register_uart_device(var, config)
+    await i2c.register_i2c_device(var, config)
 
     if co2_config := config.get(CONF_CO2):
         sens = await sensor.new_sensor(co2_config)
@@ -148,13 +146,13 @@ async def to_code(config) -> None:
     #     sens = await text_sensor.new_text_sensor(iaq_text_config)
     #     cg.add(var.set_iaq_text_sensor(sens))
 
-    # Debug flag for UART logging
+    # Debug flag for I2C logging
     cg.add(var.set_debug_uart(config[CONF_DEBUG]))
 
-    # Measurement and warmup timeouts
+    # Measurement period for I2C continuous mode
     cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
     cg.add(var.set_warmup_timeout(config[CONF_WARMUP_TIMEOUT]))
 
-    # Sensor configuration (sent at startup)
+    # Config period and smoothing samples (kept for compatibility but not used in I2C mode)
     cg.add(var.set_config_period(config[CONF_CONFIG_PERIOD]))
     cg.add(var.set_smoothing_samples(config[CONF_SMOOTHING_SAMPLES]))
