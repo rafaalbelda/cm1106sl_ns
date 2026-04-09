@@ -130,7 +130,6 @@ void CM1106SLNSComponent::dump_config() {
   LOG_SENSOR(" ", "IAQ Index", this->iaq_numeric_);
   ESP_LOGCONFIG(TAG, "Debug: %s", this->debug_ ? "enabled" : "disabled");
   ESP_LOGCONFIG(TAG, "Measurement period: %us", this->measurement_period_ / 1000);
-  this->check_i2c_settings();
 }
 
 }  // namespace cm1106sl_ns
