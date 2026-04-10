@@ -20,19 +20,12 @@ CM1106SLNSComponent = cm1106sl_ns_ns.class_(
     "CM1106SLNSComponent", cg.Component, i2c.I2CDevice
 )
 
-CONF_DF3 = "df3"
-CONF_DF4 = "df4"
-CONF_STATUS = "status"
 CONF_STABILITY = "stability"
 CONF_READY = "ready"
 CONF_ERROR = "error"
 CONF_IAQ_NUMERIC = "iaq_numeric"
-CONF_IAQ_TEXT = "iaq_text"
 CONF_DEBUG = "debug"
 CONF_MEASUREMENT_PERIOD = "measurement_period"
-CONF_WARMUP_TIMEOUT = "warmup_timeout"
-CONF_CONFIG_PERIOD = "config_period"
-CONF_SMOOTHING_SAMPLES = "smoothing_samples"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -49,21 +42,6 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
                 }
             ),
-            cv.Optional(CONF_DF3): sensor.sensor_schema().extend(
-                {
-                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
-                }
-            ),
-            cv.Optional(CONF_DF4): sensor.sensor_schema().extend(
-                {
-                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
-                }
-            ),
-            # cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema().extend(
-            #     {
-            #         cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-            #     }
-            # ),
             cv.Optional(CONF_STABILITY): sensor.sensor_schema().extend(
                 {
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
@@ -84,23 +62,11 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
                 }
             ),
-            # cv.Optional(CONF_IAQ_TEXT): text_sensor.text_sensor_schema().extend(
-            #     {
-            #         cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-            #     }
-            # ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
-            cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_CONFIG_PERIOD, default=4): cv.All(
-                cv.positive_int, cv.Range(min=4, max=600)
-            ),
-            cv.Optional(CONF_SMOOTHING_SAMPLES, default=1): cv.All(
-                cv.positive_int, cv.Range(min=1, max=15)
-            ),
+            cv.Optional(CONF_MEASUREMENT_PERIOD, default="60s"): cv.positive_time_period_milliseconds,
         },
     )
-    .extend(i2c.i2c_device_schema(0x5A))
+    .extend(i2c.i2c_device_schema(0x34))
 )
 
 
@@ -113,18 +79,6 @@ async def to_code(config) -> None:
     if co2_config := config.get(CONF_CO2):
         sens = await sensor.new_sensor(co2_config)
         cg.add(var.set_co2_sensor(sens))
-
-    if df3_config := config.get(CONF_DF3):
-        sens = await sensor.new_sensor(df3_config)
-        cg.add(var.set_df3_sensor(sens))
-
-    if df4_config := config.get(CONF_DF4):
-        sens = await sensor.new_sensor(df4_config)
-        cg.add(var.set_df4_sensor(sens))
-
-    # if status_config := config.get(CONF_STATUS):
-    #     sens = await text_sensor.new_text_sensor(status_config)
-    #     cg.add(var.set_status_sensor(sens))
 
     if stability_config := config.get(CONF_STABILITY):
         sens = await sensor.new_sensor(stability_config)
@@ -142,17 +96,8 @@ async def to_code(config) -> None:
         sens = await sensor.new_sensor(iaq_numeric_config)
         cg.add(var.set_iaq_numeric_sensor(sens))
 
-    # if iaq_text_config := config.get(CONF_IAQ_TEXT):
-    #     sens = await text_sensor.new_text_sensor(iaq_text_config)
-    #     cg.add(var.set_iaq_text_sensor(sens))
-
     # Debug flag for I2C logging
-    cg.add(var.set_debug_uart(config[CONF_DEBUG]))
+    cg.add(var.set_debug(config[CONF_DEBUG]))
 
     # Measurement period for I2C continuous mode
     cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
-    cg.add(var.set_warmup_timeout(config[CONF_WARMUP_TIMEOUT]))
-
-    # Config period and smoothing samples (kept for compatibility but not used in I2C mode)
-    cg.add(var.set_config_period(config[CONF_CONFIG_PERIOD]))
-    cg.add(var.set_smoothing_samples(config[CONF_SMOOTHING_SAMPLES]))
