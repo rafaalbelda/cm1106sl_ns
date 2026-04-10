@@ -50,28 +50,12 @@ void CM1106SLNSComponent::loop() {
   if (millis() - this->last_frame_time_ > this->measurement_period_) {
     uint8_t co2_data[2];
     
-    // Cubic testing board protocol: write command then read
-    // Send: 68 06 00 02 (address+write, register, read_command, byte_count)
-    uint8_t cmd[3] = {REG_CO2_HIGH, 0x00, 0x02};
-    if (!this->write(cmd, 3)) {
+    // In continuous mode, the sensor automatically updates registers 0x06/0x07
+    // Simply read CO2 concentration from registers
+    if (!this->read_bytes(REG_CO2_HIGH, co2_data, 2)) {
       this->error_count_++;
       if (!this->timeout_active_) {
-        ESP_LOGW(TAG, "I2C read command error (count: %u)", this->error_count_);
-        if (this->error_sensor_ != nullptr)
-          this->error_sensor_->publish_state(true);
-        this->timeout_active_ = true;
-      }
-      return;
-    }
-    
-    // Small delay as per datasheet (sensor prepares response)
-    delayMicroseconds(100);
-    
-    // Read: 69 (address+read) -> receive 2 bytes
-    if (!this->read_bytes_raw(co2_data, 2)) {
-      this->error_count_++;
-      if (!this->timeout_active_) {
-        ESP_LOGW(TAG, "I2C data read error (count: %u)", this->error_count_);
+        ESP_LOGW(TAG, "I2C read error (count: %u)", this->error_count_);
         if (this->error_sensor_ != nullptr)
           this->error_sensor_->publish_state(true);
         this->timeout_active_ = true;

@@ -3,8 +3,9 @@ esphome:
   friendly_name: AirQ32
 
 external_components:
-  - source: github://rafaalbelda/cm1106sl_ns
+  - source: github://rafaalbelda/cm1106sl_ns@i2c
     components: [cm1106sl_ns]
+  #  - source: components
 
 esp32:
   board: esp32dev
@@ -42,11 +43,11 @@ bluetooth_proxy:
   active: true
 
 uart:
-  # - id: uart_cm
-  #   rx_pin: 23
-  #   tx_pin: 5
-  #   baud_rate: 9600
-  #   debug:
+  - id: uart_cm
+    rx_pin: 23
+    tx_pin: 5
+    baud_rate: 9600
+    debug:
   - id: uart_pm
     rx_pin: 16
     tx_pin: 17
@@ -57,36 +58,64 @@ uart:
 i2c:
   sda: GPIO21
   scl: GPIO22
+  frequency: 100kHz  # Increase frequency for multiple I2C devices
 
 sensor:
-  # CM1106SL-NS CO2 Sensor via I2C (Continuous Measurement Mode)
+  # UART CM1106 (commented - using I2C CM1106SL-NS instead)
+  # - platform: cm1106
+  #   uart_id: uart_cm
+  #   co2:
+  #     name: CO2
+  #     id: my_co2
+
   - platform: cm1106sl_ns
-    id: my_co2
-    update_interval: 60s
-    debug: false
+    id: my_co2_i2c
+    update_interval: 60s  # Measurement period in ESPHome
+    debug: true          # Enable I2C debug logging
     
     co2:
       name: "CO2 Concentration"
-      unit_of_measurement: "ppm"
-      icon: "mdi:molecule-co2"
     
     stability:
       name: "CO2 Stability"
     
     ready:
-      name: "CO2 Sensor Ready"
+      name: "Sensor Ready"
     
     error:
-      name: "CO2 Sensor Error"
+      name: "Sensor Error"
     
     iaq_numeric:
-      name: "Air Quality Index"
-    
-    # Optional sensors (uncomment to enable):
-    # df3:
-    #   name: "Sensor Status DF3"
-    # df4:
-    #   name: "Sensor Status DF4"
+      name: "Air Quality Index"  
+#   - platform: cm1106sl_ns
+# #    id: my_co2
+#     uart_id: uart_cm
+#     debug: true
+#     #name: "CM1106SL-NS"
+#     #update_interval: 60s
+#     # measurement_period: 20s    # timeout sin datos (default 15s)
+#     # warmup_timeout: 90s        # timeout durante warmup (default 60s)
+#     # config_period: 10        # período en segundos (4-600s, default 4s)
+#     # smoothing_samples: 3     # datos suavizados (1-15, default 1)
+#     co2:
+#        name: "CO2 (ppm)"
+#     # ready:
+#     #   name: "CM1106 Ready"
+#     # error:
+#     #   name: "CM1106 Error"
+#     # iaq_numeric:
+#     #   name: "IAQ (numeric)"
+#     # Opcionales:
+#     # df3:
+#     #   name: "DF3"
+#     # df4:
+#     #   name: "DF4"
+#     # status:
+#     #   name: "CM1106 Status"
+#     # stability:
+#     #   name: "Stability"
+#     # iaq_text:
+#     #   name: "IAQ (text)"
 
   - platform: bme280_i2c
     temperature:
@@ -99,6 +128,7 @@ sensor:
       name: "Humedad"
       id: my_humidity
     address: 0x76
+    update_interval: 60s  # Synchronized with CO2 sensor
 
   - platform: absolute_humidity
     name: Absolute Humidity
@@ -117,7 +147,7 @@ sensor:
     pm_10_0:
       name: "PM10"
       id: pm10_sensor
-    update_interval: 30s
+    update_interval: 60s  # Synchronized with other sensors
 
   - platform: aqi
     name: "European Air Quality Index"
@@ -222,27 +252,27 @@ display:
             it.print(2*w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "P:");
             it.printf(5*w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(my_pressure).state);
 
-      #  - id: page3
-      #    lambda: |-
-      #       // Clear the display
-      #       it.fill(COLOR_OFF);
+       - id: page3
+         lambda: |-
+            // Clear the display
+            it.fill(COLOR_OFF);
             
-      #       int h = it.get_height();
-      #       int w = it.get_width();
+            int h = it.get_height();
+            int w = it.get_width();
             
-      #       // Draw a rectangle
-      #       it.rectangle(0, 0, w, h);
+            // Draw a rectangle
+            it.rectangle(0, 0, w, h);
 
-      #       it.line(1, h/2, w-1, h/2);
+            it.line(1, h/2, w-1, h/2);
 
 
-      #       // Print AQI
-      #       it.print(3, 3, id(font16), "AQU:");
-      #       it.printf(w/2, h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(euaqi).state);
+            // Print AQI
+            it.print(3, 3, id(font16), "AQU:");
+            it.printf(w/2, h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(euaqi).state);
 
-      #       // Print CO2
-      #       it.print(3, h/2+3, id(font16), "CO2:");
-      #       it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2).state);
+            // Print CO2
+            it.print(3, h/2+3, id(font16), "CO2:");
+            it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2).state);
 
 
     
