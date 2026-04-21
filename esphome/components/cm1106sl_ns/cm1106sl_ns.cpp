@@ -11,14 +11,20 @@ static const char *const TAG = "cm1106sl_ns";
 void CM1106SLNSComponent::setup() {
   this->last_frame_time_ = millis() - this->measurement_period_;
   this->measurement_start_time_ = 0;
-  this->next_configure_time_ = millis() + INITIAL_CONFIGURE_DELAY_MS;
   this->error_count_ = 0;
   this->timeout_active_ = false;
   this->measurement_pending_ = false;
-  this->configured_ = false;
   
   ESP_LOGI(TAG, "CM1106SL-NS initialized on I2C at address 0x%02X", this->get_i2c_address());
-  ESP_LOGI(TAG, "Delaying first CM1106SL-NS configuration by %us", INITIAL_CONFIGURE_DELAY_MS / 1000);
+
+  // Set measurement mode to single (0x01 = Mode A).
+  if (!this->write_byte(REG_MEASUREMENT_MODE, 0x01)) {
+    ESP_LOGW(TAG, "Failed to enable single measurement mode");
+    this->set_error_(true);
+    return;
+  }
+  
+  ESP_LOGI(TAG, "Single measurement mode enabled, read period: %us", this->measurement_period_ / 1000);
 }
 
 void CM1106SLNSComponent::publish_iaq_(uint16_t co2) {
@@ -46,35 +52,11 @@ void CM1106SLNSComponent::set_error_(bool error) {
   this->timeout_active_ = error;
 }
 
-bool CM1106SLNSComponent::configure_sensor_() {
-  // Set measurement mode to single (0x01 = Mode A).
-  if (!this->write_byte(REG_MEASUREMENT_MODE, 0x01)) {
-    this->configured_ = false;
-    this->measurement_pending_ = false;
-    this->next_configure_time_ = millis() + CONFIGURE_RETRY_INTERVAL_MS;
-    this->status_set_warning();
-    this->set_error_(true);
-    ESP_LOGW(TAG, "CM1106SL-NS not responding at 0x%02X; retrying configuration in %us", this->get_i2c_address(),
-             CONFIGURE_RETRY_INTERVAL_MS / 1000);
-    return false;
-  }
-
-  this->configured_ = true;
-  this->error_count_ = 0;
-  this->status_clear_warning();
-  this->set_error_(false);
-  ESP_LOGI(TAG, "Single measurement mode enabled, read period: %us", this->measurement_period_ / 1000);
-  return true;
-}
-
 bool CM1106SLNSComponent::start_single_measurement_() {
   if (!this->write_byte(REG_START_SINGLE_MEASUREMENT, 0x01)) {
     this->error_count_++;
     ESP_LOGW(TAG, "Failed to start single measurement (count: %u)", this->error_count_);
-    this->configured_ = false;
-    this->next_configure_time_ = millis() + CONFIGURE_RETRY_INTERVAL_MS;
     this->set_error_(true);
-    this->status_set_warning();
     return false;
   }
 
@@ -91,18 +73,12 @@ bool CM1106SLNSComponent::read_register_bytes_(uint8_t reg, uint8_t *data, size_
   auto err = this->write(&reg, 1);
   if (err != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "I2C register select 0x%02X failed: %u", reg, err);
-    this->configured_ = false;
-    this->next_configure_time_ = millis() + CONFIGURE_RETRY_INTERVAL_MS;
-    this->status_set_warning();
     return false;
   }
 
   err = this->read(data, len);
   if (err != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "I2C raw read from 0x%02X failed: %u", reg, err);
-    this->configured_ = false;
-    this->next_configure_time_ = millis() + CONFIGURE_RETRY_INTERVAL_MS;
-    this->status_set_warning();
     return false;
   }
 
@@ -156,13 +132,6 @@ bool CM1106SLNSComponent::read_measurement_() {
 
 void CM1106SLNSComponent::loop() {
   const uint32_t now = millis();
-
-  if (!this->configured_) {
-    if ((int32_t) (now - this->next_configure_time_) < 0)
-      return;
-    this->configure_sensor_();
-    return;
-  }
 
   if (!this->measurement_pending_) {
     if (now - this->last_frame_time_ >= this->measurement_period_) {
