@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "documentation": "https://github.com/rafaalbelda/cm1106sl_ns",
   "requirements": [],
-  "dependencies": ["uart"],
+  "dependencies": ["i2c"],
   "codeowners": ["@rafaalbelda"]
 }
 

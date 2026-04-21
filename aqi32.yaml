@@ -70,7 +70,7 @@ sensor:
 
   - platform: cm1106sl_ns
     id: my_co2_i2c
-    update_interval: 60s  # Measurement period in ESPHome
+    measurement_period: 60s  # Measurement period in continuous mode
     debug: true          # Enable I2C debug logging
     
     co2:
@@ -272,7 +272,7 @@ display:
 
             // Print CO2
             it.print(3, h/2+3, id(font16), "CO2:");
-            it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2).state);
+            it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2_i2c).state);
 
 
     

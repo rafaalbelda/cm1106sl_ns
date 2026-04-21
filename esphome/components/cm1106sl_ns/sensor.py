@@ -99,5 +99,5 @@ async def to_code(config) -> None:
     # Debug flag for I2C logging
     cg.add(var.set_debug(config[CONF_DEBUG]))
 
-    # Measurement period for I2C continuous mode
+    # Read interval for I2C single measurement mode
     cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
