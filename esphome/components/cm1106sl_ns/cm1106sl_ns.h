@@ -19,6 +19,8 @@ static const uint8_t REG_CO2_LOW = 0x07;                   // CO2 concentration 
 static const uint8_t REG_START_SINGLE_MEASUREMENT = 0x93;  // Write 0x01 to start one single measurement
 static const uint8_t REG_MEASUREMENT_MODE = 0x95;          // 0x00=continuous, 0x01=single
 static const uint32_t SINGLE_MEASUREMENT_DELAY_MS = 3000;  // Conservative delay when RDY is not connected
+static const uint32_t INITIAL_CONFIGURE_DELAY_MS = 10000;
+static const uint32_t CONFIGURE_RETRY_INTERVAL_MS = 120000;
 
 class CM1106SLNSComponent : public Component, public i2c::I2CDevice {
  public:
@@ -45,14 +47,17 @@ class CM1106SLNSComponent : public Component, public i2c::I2CDevice {
   uint8_t stability_counter_ = 0;
   uint32_t last_frame_time_ = 0;
   uint32_t measurement_start_time_ = 0;
+  uint32_t next_configure_time_ = 0;
   uint8_t error_count_ = 0;
   bool debug_ = false;
   bool timeout_active_ = false;
   bool measurement_pending_ = false;
+  bool configured_ = false;
   uint32_t measurement_period_ = 60000;  // 60 seconds default
 
   void publish_iaq_(uint16_t co2);
   void set_error_(bool error);
+  bool configure_sensor_();
   bool start_single_measurement_();
   bool read_register_bytes_(uint8_t reg, uint8_t *data, size_t len);
   bool read_measurement_();
