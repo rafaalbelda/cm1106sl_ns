@@ -18,7 +18,7 @@ static const uint8_t REG_CO2_HIGH = 0x06;                  // CO2 concentration 
 static const uint8_t REG_CO2_LOW = 0x07;                   // CO2 concentration low byte
 static const uint8_t REG_START_SINGLE_MEASUREMENT = 0x93;  // Write 0x01 to start one single measurement
 static const uint8_t REG_MEASUREMENT_MODE = 0x95;          // 0x00=continuous, 0x01=single
-static const uint32_t SINGLE_MEASUREMENT_DELAY_MS = 1000;  // Datasheet cycle is roughly 730ms
+static const uint32_t SINGLE_MEASUREMENT_DELAY_MS = 3000;  // Conservative delay when RDY is not connected
 
 class CM1106SLNSComponent : public Component, public i2c::I2CDevice {
  public:
@@ -54,6 +54,7 @@ class CM1106SLNSComponent : public Component, public i2c::I2CDevice {
   void publish_iaq_(uint16_t co2);
   void set_error_(bool error);
   bool start_single_measurement_();
+  bool read_register_bytes_(uint8_t reg, uint8_t *data, size_t len);
   bool read_measurement_();
 };
 

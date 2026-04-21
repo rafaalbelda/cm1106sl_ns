@@ -58,7 +58,8 @@ uart:
 i2c:
   sda: GPIO21
   scl: GPIO22
-  frequency: 100kHz  # Increase frequency for multiple I2C devices
+  frequency: 10kHz
+  timeout: 13ms
 
 sensor:
   # UART CM1106 (commented - using I2C CM1106SL-NS instead)
@@ -70,7 +71,7 @@ sensor:
 
   - platform: cm1106sl_ns
     id: my_co2_i2c
-    measurement_period: 60s  # Measurement period in continuous mode
+    measurement_period: 60s  # Read interval in single measurement mode
     debug: true          # Enable I2C debug logging
     
     co2:

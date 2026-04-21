@@ -69,10 +69,26 @@ bool CM1106SLNSComponent::start_single_measurement_() {
   return true;
 }
 
+bool CM1106SLNSComponent::read_register_bytes_(uint8_t reg, uint8_t *data, size_t len) {
+  auto err = this->write(&reg, 1);
+  if (err != i2c::ERROR_OK) {
+    ESP_LOGW(TAG, "I2C register select 0x%02X failed: %u", reg, err);
+    return false;
+  }
+
+  err = this->read(data, len);
+  if (err != i2c::ERROR_OK) {
+    ESP_LOGW(TAG, "I2C raw read from 0x%02X failed: %u", reg, err);
+    return false;
+  }
+
+  return true;
+}
+
 bool CM1106SLNSComponent::read_measurement_() {
   uint8_t co2_data[2];
 
-  if (!this->read_bytes(REG_CO2_HIGH, co2_data, 2)) {
+  if (!this->read_register_bytes_(REG_CO2_HIGH, co2_data, sizeof(co2_data))) {
     this->error_count_++;
     ESP_LOGW(TAG, "I2C read error (count: %u)", this->error_count_);
     this->set_error_(true);
