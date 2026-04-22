@@ -67,35 +67,11 @@ sensor:
   - platform: cm1106sl_ns
     id: my_co2
     uart_id: uart_cm
-    #name: "CM1106SL-NS"
     update_interval: 60s
-    
-  #   co2:
-  #     name: "CO2 Level"
-    
-  #   df3:
-  #     name: "Sensor Status DF3"
-    
-  #   df4:
-  #     name: "Sensor Status DF4"
-      
-  #   status:
-  #     name: "Sensor Status"
-    
-  #   stability:
-  #     name: "Stability Counter"
-    
-  #   ready:
-  #     name: "Sensor Ready"
-    
-  #   error:
-  #     name: "Sensor Error"
-    
-  #   iaq_numeric:
-  #     name: "IAQ Rating"
-    
-  #   iaq_text:
-  #     name: "IAQ Text"
+    config_period: 4s
+    smoothing_samples: 1
+    co2:
+      name: "CO2 Level"
 
   - platform: bme280_i2c
     temperature:
