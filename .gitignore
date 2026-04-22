@@ -15,3 +15,7 @@ arduino/pms.h
 arduino/pms.ino
 arduino/sensor.hpp
 arduino/sensorPMSx003.hpp
+cm1106/__init__.py
+cm1106/cm1106.cpp
+cm1106/cm1106.h
+cm1106/sensor.py
