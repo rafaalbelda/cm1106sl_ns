@@ -10,6 +10,18 @@
 namespace esphome {
 namespace cm1106sl_ns {
 
+// UART Protocol: CM1106SL-NS CO2 Sensor
+// See UART_COMMUNICATION.md for protocol details
+//
+// Data Frame Format (8 bytes):
+//   [0x16][0x05][0x50][CO2H][CO2L][DF3][DF4][CS]
+//   - 0x16 0x05: Data frame header
+//   - 0x50: Command byte (read data)
+//   - CO2H/CO2L: CO2 concentration in ppm (16-bit, big-endian)
+//   - DF3: Sensor status (0x00=Normal, 0x08=Warming up, 0x01=Error, 0x02=Calibration needed)
+//   - DF4: Additional information byte
+//   - CS: Two's complement checksum
+
 class CM1106SLNSComponent : public Component, public uart::UARTDevice {
  public:
   void setup() override;
@@ -42,6 +54,23 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   sensor::Sensor *iaq_numeric_{nullptr};
   //text_sensor::TextSensor *iaq_text_{nullptr};
 
+  // Protocol constants from UART_COMMUNICATION.md
+  static constexpr uint8_t FRAME_HEADER_1 = 0x16;      // First byte of data frame
+  static constexpr uint8_t FRAME_HEADER_2 = 0x05;      // Second byte of data frame
+  static constexpr uint8_t FRAME_COMMAND = 0x50;       // Command byte for data frame
+  static constexpr uint8_t CONFIG_RESPONSE_BYTE_1 = 0x16;
+  static constexpr uint8_t CONFIG_RESPONSE_BYTE_2 = 0x01;
+  static constexpr uint8_t CONFIG_RESPONSE_CMD = 0x50;
+  static constexpr uint8_t FRAME_LENGTH = 8;           // Data frame is 8 bytes
+  static constexpr uint8_t CONFIG_RESPONSE_LENGTH = 4; // Config response is 4 bytes
+  static constexpr uint8_t RESET_CMD_LENGTH = 5;       // Reset command is 5 bytes
+  static constexpr uint16_t CO2_MIN_VALID = 300;       // Minimum valid CO2 ppm
+  static constexpr uint16_t CO2_MAX_VALID = 5000;      // Maximum valid CO2 ppm
+  static constexpr uint32_t CONFIG_RESPONSE_TIMEOUT = 2000;  // 2 seconds
+  static constexpr uint8_t MAX_BAD_FRAMES = 5;         // Reset after 5 bad frames
+  static constexpr uint8_t STABILITY_THRESHOLD = 20;   // ppm difference for stability
+  static constexpr uint32_t WARMUP_STATUS_VALUE = 0x08; // DF3 value for warming up
+
   uint16_t last_valid_co2_ = 0;
   uint8_t stability_counter_ = 0;
   uint32_t last_frame_time_ = 0;
@@ -57,9 +86,23 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   uint32_t config_cmd_time_ = 0;
   bool config_command_sent_ = false;
 
+  // Continuous Mode Configuration
+  // Similar to Arduino: setupCM1106() detects current mode and configures
+  // References:
+  //   - Arduino: my_cm1106.ino setupCM1106() / get_working_status() / set_working_status()
+  //   - UART: UART_COMMUNICATION.md - Modo Continuo
+  static constexpr uint32_t CONFIG_RETRY_DELAY = 1000;    // Retry config after 1 second
+  static constexpr uint8_t MAX_CONFIG_RETRIES = 5;        // Maximum retry attempts
+  
+  uint8_t config_retry_count_ = 0;
+  uint32_t config_retry_time_ = 0;
+  bool continuous_mode_confirmed_ = false;
+
   std::string interpret_status_(uint8_t df3, uint8_t df4);
   void send_config_command_();
+  void check_config_retry_();
   bool validate_config_response_(const uint8_t *buffer, size_t len);
+  bool validate_frame_header_(const uint8_t *buffer, size_t len);
   bool validate_checksum_(const uint8_t *buffer, size_t len);
   uint8_t calculate_checksum_(const uint8_t *buffer, size_t len);
   void publish_iaq_(uint16_t co2);
