@@ -32,6 +32,7 @@ void CM1106SLNSComponent::setup() {
                 this->config_period_s_, this->smoothing_samples_);
   
   this->send_config_command_();
+  this->config_command_sent_ = true;
 }
 
 std::string CM1106SLNSComponent::interpret_status_(uint8_t df3, uint8_t df4) {
@@ -154,7 +155,10 @@ void CM1106SLNSComponent::soft_reset_() {
   
   // Reset state variables
   this->awaiting_config_response_ = true;
+  this->config_command_sent_ = false;
+  this->config_retry_count_ = 0;
   this->config_cmd_time_ = millis();
+  this->config_retry_time_ = millis();
   this->last_frame_time_ = millis();
 }
 
@@ -204,6 +208,17 @@ void CM1106SLNSComponent::loop() {
   // Similar to Arduino: setupCM1106() waits for sensor confirmation
   // Reference: UART_COMMUNICATION.md - Secuencia de Inicialización, Arduino my_cm1106.ino
   if (this->awaiting_config_response_) {
+    // After soft reset, wait ~1s before sending config again.
+    if (!this->config_command_sent_) {
+      if (millis() - this->config_cmd_time_ >= this->CONFIG_RETRY_DELAY) {
+        ESP_LOGW(TAG, "Step 1: Sending config command after reset delay");
+        this->send_config_command_();
+        this->config_command_sent_ = true;
+        this->config_cmd_time_ = millis();
+      }
+      return;
+    }
+
     // Log once at the start that we're waiting
     static bool logged_waiting = false;
     if (!logged_waiting) {
@@ -246,10 +261,10 @@ void CM1106SLNSComponent::loop() {
   
   // Phase 2: Monitor for data timeout
   // Reference: UART_COMMUNICATION.md - Manejo de Errores
-  if (millis() - this->last_frame_time_ > this->measurement_period_) {
+  if (millis() - this->last_frame_time_ > (this->measurement_period_ + this->DATA_TIMEOUT_MARGIN)) {
     if (!this->timeout_active_) {
       ESP_LOGW(TAG, "Data Timeout: no frame received for >%ums (expected every %ums)", 
-               millis() - this->last_frame_time_, this->measurement_period_);
+               millis() - this->last_frame_time_, this->measurement_period_ + this->DATA_TIMEOUT_MARGIN);
       if (this->error_sensor_ != nullptr)
         this->error_sensor_->publish_state(true);
       this->timeout_active_ = true;
@@ -407,6 +422,7 @@ void CM1106SLNSComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Warmup timeout: %ums", this->warmup_timeout_);
   ESP_LOGCONFIG(TAG, "  Config retry: max %u attempts, delay %ums between retries", 
                 this->MAX_CONFIG_RETRIES, this->CONFIG_RETRY_DELAY);
+  ESP_LOGCONFIG(TAG, "  Data timeout margin: %ums", this->DATA_TIMEOUT_MARGIN);
   ESP_LOGCONFIG(TAG, "  CO2 valid range: %u - %u ppm", this->CO2_MIN_VALID, this->CO2_MAX_VALID);
   ESP_LOGCONFIG(TAG, "  Stability threshold: %u ppm", this->STABILITY_THRESHOLD);
   ESP_LOGCONFIG(TAG, "  Expected UART baud_rate: 9600");

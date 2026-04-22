@@ -67,6 +67,7 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   static constexpr uint16_t CO2_MIN_VALID = 300;       // Minimum valid CO2 ppm
   static constexpr uint16_t CO2_MAX_VALID = 5000;      // Maximum valid CO2 ppm
   static constexpr uint32_t CONFIG_RESPONSE_TIMEOUT = 2000;  // 2 seconds
+  static constexpr uint32_t DATA_TIMEOUT_MARGIN = 500;  // ms margin over expected period
   static constexpr uint8_t MAX_BAD_FRAMES = 5;         // Reset after 5 bad frames
   static constexpr uint8_t STABILITY_THRESHOLD = 20;   // ppm difference for stability
   static constexpr uint32_t WARMUP_STATUS_VALUE = 0x08; // DF3 value for warming up
@@ -80,11 +81,11 @@ class CM1106SLNSComponent : public Component, public uart::UARTDevice {
   bool timeout_active_ = false;
   uint32_t measurement_period_ = 15000;  // 15 seconds
   uint32_t warmup_timeout_ = 60000;      // 60 seconds
-  uint16_t config_period_s_ = 4;         // config period in seconds (4-600s)
+  uint16_t config_period_s_ = 4;         // config period in seconds (1-65535s)
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool awaiting_config_response_ = true;
   uint32_t config_cmd_time_ = 0;
-  bool config_command_sent_ = false;
+  bool config_command_sent_ = false;     // tracks delayed config send after soft reset
 
   // Continuous Mode Configuration
   // Similar to Arduino: setupCM1106() detects current mode and configures

@@ -95,10 +95,10 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_MEASUREMENT_PERIOD, default="15s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_WARMUP_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_CONFIG_PERIOD, default=4): cv.All(
-                cv.positive_int, cv.Range(min=4, max=600)
+                cv.positive_int, cv.Range(min=1, max=65535)
             ),
             cv.Optional(CONF_SMOOTHING_SAMPLES, default=1): cv.All(
-                cv.positive_int, cv.Range(min=1, max=15)
+                cv.positive_int, cv.Range(min=1, max=255)
             ),
         },
     )
