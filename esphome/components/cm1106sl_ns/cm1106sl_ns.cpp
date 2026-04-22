@@ -99,7 +99,7 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   }
   
   // Send command
-  this->write_array(command, command_len - 1;
+  this->write_array(command, command_len - 1);
   this->write_byte(cm1106_checksum(command, command_len));
   this->flush();
 
