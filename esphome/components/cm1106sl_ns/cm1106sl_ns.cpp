@@ -99,7 +99,8 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   }
   
   // Send command
-  this->write_array(command, command_len);
+  this->write_array(command, command_len - 1;
+  this->write_byte(cm1106_checksum(command, command_len));
   this->flush();
 
   if (response == nullptr)
@@ -115,6 +116,9 @@ void CM1106SLNSComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Config Period: %u seconds", this->config_period_s_);
   ESP_LOGCONFIG(TAG, "  Smoothing Samples: %u", this->smoothing_samples_);
   this->check_uart_settings(9600);
+    if (this->is_failed()) {
+    ESP_LOGE(TAG, "Failed connecting to sensor");
+  }
 }
 
 }  // namespace cm1106sl_ns

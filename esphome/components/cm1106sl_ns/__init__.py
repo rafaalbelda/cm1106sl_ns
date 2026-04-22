@@ -1,1 +1,1 @@
-"""CM1106SL-NS component for ESPHome."""
+"""CM1106SL-NS component in UART Continuos mode for ESPHome."""
