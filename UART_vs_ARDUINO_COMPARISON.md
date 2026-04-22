@@ -335,24 +335,183 @@ void soft_reset_() {
 
 ---
 
+## 12. Detección y Control de Modo de Operación (CRÍTICO)
+
+### Documentación UART
+```c
+// NO DOCUMENTADO EXPLÍCITAMENTE
+// Pero se puede inferir de comandos 0x11 0x04 0x50 vs otros modos
+```
+
+### Implementación Arduino (cm1106_uart.h)
+
+**Detección de modo actual:**
+```c
+bool CM1106_UART::get_working_status(uint8_t *mode) {
+    // Comando: 0x11 0x01 0x00 (4 bytes total con checksum)
+    // Respuesta: 0x16 0x02 0x00 [MODE] [CS] (5 bytes)
+    // MODE: 0x00 = Single Measurement, 0x01 = Continuous Measurement
+    
+    send_cmd_data(CM1106_CMD_WORKING_STATUS, 4);
+    uint8_t nb = serial_read_bytes(5, CM1106_TIMEOUT);
+    
+    if (valid_response_len(CM1106_CMD_WORKING_STATUS, nb, 5)) {
+        *mode = buf_msg[3];  // Modo en byte 3
+        result = true;
+    }
+    return result;
+}
+```
+
+**Cambio de modo a continuo:**
+```c
+bool CM1106_UART::set_working_status(uint8_t mode) {
+    // Comando: 0x11 0x01 0x00 [MODE] (5 bytes total con checksum)
+    // MODE: 0x00 = Single, 0x01 = Continuous
+    // Respuesta: 0x16 0x01 0x00 [CS] (4 bytes)
+    
+    if (mode == CM1106_CONTINUOUS_MEASUREMENT) {
+        buf_msg[3] = mode;
+        send_cmd_data(CM1106_CMD_WORKING_STATUS, 5);
+        uint8_t nb = serial_read_bytes(4, CM1106_TIMEOUT);
+        
+        if (valid_response_len(CM1106_CMD_WORKING_STATUS, nb, 4)) {
+            result = true;  // Modo cambiado exitosamente
+        }
+    }
+    return result;
+}
+```
+
+**Uso en Arduino (mi_cm1106.ino):**
+```c
+uint8_t mode;
+if (sensor_CM1106->get_working_status(&mode)) {
+    if (mode == CM1106_SINGLE_MEASUREMENT) {
+        DEBUG_OUT.println("Single measurement mode detected");
+        // Cambiar a continuo
+        if (sensor_CM1106->set_working_status(CM1106_CONTINUOUS_MEASUREMENT)) {
+            DEBUG_OUT.println("Changed to continuous mode");
+        }
+    } else {
+        DEBUG_OUT.println("Already in continuous mode");
+    }
+}
+```
+
+### Implementación ESPHome (cm1106sl_ns)
+
+**Estado Actual:** ❌ **NO IMPLEMENTADO**
+
+El componente ESPHome actual:
+- ✅ Envía comando de configuración de período y suavizado (0x11 0x04 0x50 ...)
+- ❌ **NO detecta el modo actual del sensor**
+- ❌ **NO verifica si está en modo continuo**
+- ❌ **NO cambia el modo a continuo si es necesario**
+
+**Consecuencia Observada:**
+```
+[14:23:45] No data available in buffer (waiting for continuous frames)
+[14:23:45] No data available in buffer (waiting for continuous frames)
+...
+```
+
+El sensor permanece en **modo single** (por defecto), por lo que:
+- No envía frames continuos automáticamente
+- Solo responde a comandos explícitos (modo query)
+- El buffer UART nunca recibe datos
+
+### Protocolo para Modo (Derivado de Arduino)
+
+**Comando: GET MODE (Leer modo actual)**
+```
+TX: [0x11] [0x01] [0x00] [CS]
+RX: [0x16] [0x02] [0x00] [MODE] [CS]
+
+MODE: 
+  0x00 = Single Measurement
+  0x01 = Continuous Measurement
+```
+
+**Comando: SET MODE (Cambiar a continuo)**
+```
+TX: [0x11] [0x01] [0x00] [0x01] [CS]
+RX: [0x16] [0x01] [0x00] [CS]
+```
+
+---
+
+## 13. Comparativa de Setup/Initialization
+
+### Arduino (my_cm1106.ino)
+```c
+void setupCM1106() {
+    // 1. Crear instancia de librería
+    sensor_CM1106 = new CM1106_UART(CM1106_serial);
+    
+    // 2. Detectar versión (para confirmar comunicación)
+    sensor_CM1106->get_software_version(sensor.softver);
+    
+    // 3. **DETECTAR MODO ACTUAL** ← ESPHome NO hace esto
+    uint8_t mode;
+    if (sensor_CM1106->get_working_status(&mode)) {
+        if (mode == CM1106_SINGLE_MEASUREMENT) {
+            DEBUG_OUT.println("Single");
+            // 4. **CAMBIAR A CONTINUO** ← ESPHome NO hace esto
+            sensor_CM1106->set_working_status(CM1106_CONTINUOUS_MEASUREMENT);
+        } else {
+            DEBUG_OUT.println("Continuous");
+        }
+    }
+    
+    // 5. Obtener período y suavizado actuales
+    int16_t period;
+    uint8_t smoothed;
+    sensor_CM1106->get_measurement_period(&period, &smoothed);
+    
+    // 6. En setup() loop: leer CO2 con get_co2() en modo query
+}
+```
+
+### ESPHome (cm1106sl_ns.cpp)
+```c
+void CM1106SLNSComponent::setup() {
+    // 1. ✅ Enviar comando de configuración
+    uint8_t cmd[7] = {0x11, 0x04, 0x50, df1, df2, df3, cs};
+    
+    // 2. ✅ Validar respuesta
+    if (response[0] == 0x16 && response[1] == 0x01) {
+        ESP_LOGCONFIG("Configuration successful");
+    }
+    
+    // 3. ❌ FALTA: Detectar modo actual (get_working_status)
+    // 4. ❌ FALTA: Cambiar a continuo si es necesario (set_working_status)
+}
+```
+
+---
+
 ## Resumen de Discrepancias
 
 ### ✅ Implementado Correctamente
 
 1. **Velocidad UART:** 9600 bps
-2. **Modo Continuo:** Configuración y lectura
-3. **Período de Medición:** Lectura de configuración actual
-4. **Muestras de Suavizado:** Soporte
-5. **Extracción de CO2:** Valor en ppm correcto
+2. **Configuración de período y suavizado:** Comando 0x11 0x04 0x50
+3. **Extracción de CO2:** Bytes 3-4 del frame continuo
+4. **Checksum:** Implementación correcta (complemento a dos)
+
+### 🔴 CRÍTICO - No Implementado (CAUSA DEL PROBLEMA)
+
+1. **Detección de modo:** ❌ No se consulta `get_working_status()`
+2. **Cambio a continuo:** ❌ No se ejecuta `set_working_status(0x01)`
+3. **Sin estos dos pasos, el sensor no entra en modo continuo y nunca envía frames**
 
 ### ⚠️ No Implementado o No Visible
 
 1. **Estados DF3/DF4:** No se extraen ni procesan
 2. **Manejo de Timeouts:** No implementado
 3. **Reset Suave:** No implementado
-4. **Validación de Checksum:** Interna (no visible)
-5. **Modo Single:** Se cambia automáticamente a continuo
-6. **Estabilidad del Sensor:** No se calcula
+4. **ABC (Auto Baseline Calibration):** No implementado
 
 ### 📚 Funcionalidades Extra (Fuera de documentación UART)
 
@@ -364,30 +523,59 @@ void soft_reset_() {
 
 ## Conclusiones
 
-### Nivel de Abstracción
+### El Problema Encontrado
 
-El código Arduino usa una **librería de abstracción** (`cm1106_uart.h`) que:
+El componente ESPHome **NO IMPLEMENTA LOS COMANDOS DE MODO CRÍTICOS**:
+- `get_working_status()` - Leer modo actual
+- `set_working_status(CM1106_CONTINUOUS_MEASUREMENT)` - Cambiar a continuo
 
-- ✅ Implementa correctamente el protocolo UART especificado
-- ✅ Oculta detalles de bytes, checksums y timeouts
-- ✅ Proporciona interfaz limpia de alto nivel
-- ⚠️ No expone todos los parámetros de diagnóstico (DF3, DF4)
+Sin esto, el sensor permanece en modo Single (por defecto), lo que causa:
+- "No data available in buffer" continuamente
+- Sensor no envía frames automáticos
+- Component espera frames que nunca llegan
 
-### Validez Documentación
+### Solución Requerida
 
-La documentación UART es **válida y precisa**, pero el código Arduino demuestra que:
+Implementar en `cm1106sl_ns.cpp::setup()`:
 
-1. **Es correcto usar una librería** para abstraer estos detalles
-2. **Se puede simplificar significativamente** la implementación con abstracciones
-3. **Se pueden agregar características** adicionales (ABC, versión firmware)
-4. **Algunos detalles** (estadísticas, DF3/DF4) quedan fuera del código Arduino actual
+```c
+// 1. Detectar modo actual
+uint8_t current_mode = 0xFF;
+if (!detect_working_status(&current_mode)) {
+    ESP_LOGE("Failed to detect working status");
+    this->mark_failed();
+    return;
+}
+
+ESP_LOGCONFIG("Current mode: %s", 
+    current_mode == 0x00 ? "Single Measurement" : "Continuous Measurement");
+
+// 2. Si no está en continuo, cambiar
+if (current_mode != CM1106_CONTINUOUS_MEASUREMENT) {
+    ESP_LOGCONFIG("Switching to continuous mode...");
+    if (!set_working_status(CM1106_CONTINUOUS_MEASUREMENT)) {
+        ESP_LOGE("Failed to set continuous mode");
+        this->mark_failed();
+        return;
+    }
+    ESP_LOGCONFIG("Successfully changed to continuous mode");
+}
+
+// 3. Ahora sí, enviar configuración de período y suavizado
+// ... (código existente)
+```
+
+### Validez de Documentación UART
+
+- ✅ La documentación UART es válida y precisa
+- ✅ El protocolo especificado coincide con Arduino
+- ⚠️ La documentación NO documenta explícitamente los comandos de modo
+- ℹ️ Estos comandos se infieren del protocolo general y se ven en Arduino
 
 ### Recomendaciones
 
-1. **Actualizar documentación UART** para indicar que también existen APIs de alto nivel
-2. **Expandir ejemplo Arduino** para incluir:
-   - Lectura de DF3/DF4 (estado del sensor)
-   - Manejo de timeouts
-   - Cálculo de estabilidad
-3. **Considerar librería UART** en el componente ESPHome si no la utiliza
-4. **Documentar librería cm1106_uart.h** por separado
+1. **URGENTE:** Agregar `get_working_status()` y `set_working_status()` a cm1106sl_ns
+2. **URGENTE:** Llamarlos en `setup()` antes de enviar configuración de período
+3. Actualizar UART_COMMUNICATION.md para documentar explícitamente comandos de modo
+4. Agregar logging de detección de modo para debugging futuro
+5. Considerar agregar métodos adicionales (ABC, versión, serial)

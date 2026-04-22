@@ -16,11 +16,41 @@ uint8_t CM1106SLNSComponent::cm1106_checksum_(const uint8_t *response, size_t le
 }
 
 void CM1106SLNSComponent::setup() {
-  // Initialization: Send command to set continuous mode with configured period and smoothing
+  // Initialization: First detect and set working mode to continuous, then configure period/smoothing
   // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
   
   ESP_LOGCONFIG(TAG, "=== CM1106SL-NS Setup ===");
-  ESP_LOGCONFIG(TAG, "Configuring continuous mode: period=%us, smoothing=%u samples", 
+  
+  // Step 1: Detect current working mode
+  ESP_LOGCONFIG(TAG, "Step 1: Detecting sensor working mode...");
+  uint8_t current_mode = 0xFF;
+  if (!this->cm1106_get_working_status_(&current_mode)) {
+    ESP_LOGE(TAG, "Failed to detect sensor working mode");
+    this->mark_failed();
+    return;
+  }
+  
+  // Display detected mode
+  const char *mode_str = (current_mode == 0x00) ? "Single Measurement" : 
+                         (current_mode == 0x01) ? "Continuous Measurement" : 
+                         "Unknown/Invalid";
+  ESP_LOGCONFIG(TAG, "Current mode: %s (0x%02X)", mode_str, current_mode);
+  
+  // Step 2: Switch to continuous mode if not already in it
+  if (current_mode != 0x01) {  // 0x01 = Continuous Measurement
+    ESP_LOGCONFIG(TAG, "Step 2: Switching to continuous mode...");
+    if (!this->cm1106_set_working_status_(0x01)) {
+      ESP_LOGE(TAG, "Failed to set continuous mode");
+      this->mark_failed();
+      return;
+    }
+    ESP_LOGCONFIG(TAG, "Successfully changed to continuous mode");
+  } else {
+    ESP_LOGCONFIG(TAG, "Step 2: Already in continuous mode - skipping mode change");
+  }
+  
+  // Step 3: Configure period and smoothing (only if in continuous mode)
+  ESP_LOGCONFIG(TAG, "Step 3: Configuring continuous mode: period=%us, smoothing=%u samples", 
                 this->config_period_s_, this->smoothing_samples_);
   
   // Build configuration command: [0x11][0x04][0x50][DF1][DF2][DF3][CS]
@@ -48,7 +78,7 @@ void CM1106SLNSComponent::setup() {
   if (response[0] == 0x16 && response[1] == 0x01 && response[2] == 0x50) {
     uint8_t expected_cs = this->cm1106_checksum_(response, 4);
     if (response[3] == expected_cs) {
-      ESP_LOGCONFIG(TAG, "Configuration successful - sensor in continuous mode");
+      ESP_LOGCONFIG(TAG, "Configuration successful - sensor ready for continuous data streaming");
     } else {
       ESP_LOGW(TAG, "Configuration response checksum mismatch: expected 0x%02X, got 0x%02X", 
                expected_cs, response[3]);
@@ -138,6 +168,90 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
 
   // Read response
   return this->read_array(response, response_len);
+}
+
+bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
+  // Get current working mode from sensor
+  // Command: [0x11][0x01][0x00][CS] (4 bytes)
+  // Response: [0x16][0x02][0x00][MODE][CS] (5 bytes)
+  // MODE: 0x00 = Single Measurement, 0x01 = Continuous Measurement
+  
+  if (mode == nullptr) {
+    return false;
+  }
+  
+  uint8_t cmd[4] = {0x11, 0x01, 0x00, 0x00};
+  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  
+  ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x00 0x%02X", cmd[3]);
+  
+  uint8_t response[5] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to read sensor working status");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x02][0x00][MODE][CS]
+  if (response[0] != 0x16 || response[1] != 0x02 || response[2] != 0x00) {
+    ESP_LOGW(TAG, "Invalid GET mode response: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2], response[3], response[4]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, 5);
+  if (response[4] != expected_cs) {
+    ESP_LOGW(TAG, "GET mode response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[4]);
+    return false;
+  }
+  
+  *mode = response[3];
+  ESP_LOGD(TAG, "GET mode response: mode=0x%02X", *mode);
+  return true;
+}
+
+bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
+  // Set working mode on sensor
+  // Command: [0x11][0x01][0x00][MODE][CS] (5 bytes)
+  // Response: [0x16][0x01][0x00][CS] (4 bytes)
+  // MODE: 0x00 = Single Measurement, 0x01 = Continuous Measurement
+  
+  if (mode != 0x00 && mode != 0x01) {
+    ESP_LOGE(TAG, "Invalid mode value: 0x%02X (must be 0x00 or 0x01)", mode);
+    return false;
+  }
+  
+  uint8_t cmd[5] = {0x11, 0x01, 0x00, mode, 0x00};
+  cmd[4] = this->cm1106_checksum_(cmd, 5);
+  
+  const char *mode_str = (mode == 0x00) ? "Single Measurement" : "Continuous Measurement";
+  ESP_LOGD(TAG, "Sending SET mode command to %s: 0x11 0x01 0x00 0x%02X 0x%02X", 
+           mode_str, mode, cmd[4]);
+  
+  uint8_t response[4] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to set sensor working status");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x01][0x00][CS]
+  if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x00) {
+    ESP_LOGW(TAG, "Invalid SET mode response: 0x%02X 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2], response[3]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, 4);
+  if (response[3] != expected_cs) {
+    ESP_LOGW(TAG, "SET mode response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[3]);
+    return false;
+  }
+  
+  ESP_LOGD(TAG, "SET mode response: mode changed to %s", mode_str);
+  return true;
 }
 
 void CM1106SLNSComponent::dump_config() {
