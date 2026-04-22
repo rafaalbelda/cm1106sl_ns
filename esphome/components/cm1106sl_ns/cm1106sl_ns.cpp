@@ -7,11 +7,12 @@ namespace cm1106sl_ns {
 static const char *const TAG = "cm1106sl_ns";
 
 uint8_t CM1106SLNSComponent::cm1106_checksum_(const uint8_t *response, size_t len) {
-  uint8_t crc = 0;
+  // Two's complement checksum: sum all bytes except checksum, then (~sum) + 1
+  uint8_t sum = 0;
   for (size_t i = 0; i < len - 1; i++) {
-    crc -= response[i];
+    sum += response[i];
   }
-  return crc;
+  return (~sum) + 1;
 }
 
 void CM1106SLNSComponent::setup() {
@@ -38,12 +39,26 @@ void CM1106SLNSComponent::setup() {
   
   uint8_t response[4] = {0};
   if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
-    ESP_LOGE(TAG, "Failed to configure continuous mode");
+    ESP_LOGE(TAG, "Failed to send configuration command");
     this->mark_failed();
     return;
   }
   
-  ESP_LOGCONFIG(TAG, "Configuration sent successfully");
+  // Check response: should be [0x16][0x01][0x50][CS]
+  if (response[0] == 0x16 && response[1] == 0x01 && response[2] == 0x50) {
+    uint8_t expected_cs = this->cm1106_checksum_(response, 4);
+    if (response[3] == expected_cs) {
+      ESP_LOGCONFIG(TAG, "Configuration successful - sensor in continuous mode");
+    } else {
+      ESP_LOGW(TAG, "Configuration response checksum mismatch: expected 0x%02X, got 0x%02X", 
+               expected_cs, response[3]);
+    }
+  } else {
+    ESP_LOGW(TAG, "Unexpected configuration response: 0x%02X 0x%02X 0x%02X 0x%02X", 
+             response[0], response[1], response[2], response[3]);
+  }
+  
+  ESP_LOGCONFIG(TAG, "Setup complete - waiting for continuous data frames");
 }
 
 void CM1106SLNSComponent::update() {
@@ -96,7 +111,13 @@ void CM1106SLNSComponent::update() {
   
   // No complete frame available yet
   if (!this->available()) {
-    ESP_LOGD(TAG, "No data available in buffer");
+    // Only log every 30 seconds to avoid spam
+    static uint32_t last_log_time = 0;
+    uint32_t now = millis();
+    if (now - last_log_time > 30000) {
+      ESP_LOGD(TAG, "No data available in buffer (waiting for continuous frames)");
+      last_log_time = now;
+    }
   }
 }
 
