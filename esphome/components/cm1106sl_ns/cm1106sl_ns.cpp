@@ -191,7 +191,7 @@ uint8_t CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *response, size_t 
 }
 
 
-void CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len ) {                                              ) {
+void CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len ) {
   // Clear RX buffer completely
   while (this->available()) {
     this->read();
