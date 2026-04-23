@@ -107,22 +107,22 @@ void CM1106SLNSComponent::update() {
   ESP_LOGD(TAG, "Sending read command: 0x11 0x01 0x01 0x%02X", cmd[3]);
   this->cm1106_write_command_(cmd, sizeof(cmd));
 
-  uint8_t frame[8] = {0};
-  if (this->cm1106_serial_read_bytes(frame, sizeof(frame), 2) == 0) {
+  uint8_t response[8] = {0};
+  if (this->cm1106_serial_read_bytes(response, sizeof(response), 2) == 0) {
     ESP_LOGW(TAG, "No data available after read command");
     return;
   }
 
   // Validate start byte
-  if (frame[0] != 0x16) {
-    ESP_LOGW(TAG, "Invalid start byte: 0x%02X", frame[0]);
+  if (response[0] != 0x16) {
+    ESP_LOGW(TAG, "Invalid start byte: 0x%02X", response[0]);
     return;
   }
 
   // Validate checksum
-  uint8_t expected_checksum = cm1106_checksum_(frame, sizeof(frame));
-  if (frame[7] != expected_checksum) {
-    ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", expected_checksum, frame[7]);
+  uint8_t expected_checksum = cm1106_checksum_(response, sizeof(response));
+  if (response[7] != expected_checksum) {
+    ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", expected_checksum, response[7]);
     return;
   }
 
