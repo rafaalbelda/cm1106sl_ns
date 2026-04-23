@@ -265,6 +265,11 @@ void CM1106SLNSComponent::dump_config() {
     if (this->is_failed()) {
     ESP_LOGE(TAG, "Failed connecting to sensor");
   }
+
+  ESP_LOGE(TAG, "Setup:");
+  this->setup();
+
+
 }
 
 }  // namespace cm1106sl_ns
