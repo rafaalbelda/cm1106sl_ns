@@ -99,62 +99,45 @@ void CM1106SLNSComponent::setup() {
 
 
 void CM1106SLNSComponent::update() {
-  // In continuous mode, sensor automatically sends 8-byte data frames
-  // Frame format: [0x16][CMD][0x50][CO2H][CO2L][DF3][DF4][CS]
-  // We read continuous frames from the UART buffer (no explicit read command needed)
+  // Send the read command to trigger a measurement (even in continuous mode, this may be needed to prompt the sensor to send data)
+  // Reference: Arduino my_cm1106.ino loop() - in continuous mode, sensor
+  uint8_t cmd[4] = {0x11, 0x01, 0x01, 0x00};
+  cmd[3] = this->cm1106_checksum_(cmd, 4);
   
-  // Look for complete frame in buffer (8 bytes starting with 0x16)
-  while (this->available() >= 8) {
-    uint8_t frame[8] = {0};
-    
-    // Find start byte (0x16)
-    uint8_t start_byte = this->read();
-    if (start_byte != 0x16) {
-      ESP_LOGD(TAG, "Skipping byte 0x%02X, waiting for frame start 0x16", start_byte);
-      continue;  // Keep looking for frame start
-    }
-    
-    // Read remaining 7 bytes
-    frame[0] = start_byte;
-    if (!this->read_array(&frame[1], 7)) {
-      ESP_LOGW(TAG, "Failed to read complete frame from buffer");
-      return;
-    }
-    
-    // Validate checksum
-    uint8_t expected_checksum = cm1106_checksum_(frame, sizeof(frame));
-    if (frame[7] != expected_checksum) {
-      ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X, frame: [0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X]",
-               expected_checksum, frame[7], frame[0], frame[1], frame[2], frame[3], frame[4], frame[5], frame[6], frame[7]);
-      continue;  // Try next frame
-    }
-    
-    this->status_clear_warning();
-    
-    // Extract CO2 value - sensor sends continuous frame with CO2 at bytes 3-4
-    // Continuous frame format: [0x16][CMD_ECHO][0x50][CO2H][CO2L][DF3][DF4][CS]
-    uint16_t co2 = (frame[3] << 8) | frame[4];
-    uint8_t status = frame[5];
-    uint8_t info = frame[6];
-    
-    ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
-    
-    if (this->co2_sensor_ != nullptr) {
-      this->co2_sensor_->publish_state(co2);
-    }
-    
-    return;  // Frame processed successfully
+  ESP_LOGD(TAG, "Sending read command: 0x11 0x01 0x01 0x%02X", cmd[3]);
+  this->cm1106_write_command_(cmd, sizeof(cmd));
+
+  uint8_t frame[8] = {0};
+  if (this->cm1106_serial_read_bytes(frame, sizeof(frame), 2) == 0) {
+    ESP_LOGW(TAG, "No data available after read command");
+    return;
   }
-  
-  // No complete frame available yet
-  if (!this->available()) {
-    // Only log every 30 seconds to avoid spam
-    static uint32_t last_log_time = 0;
-    uint32_t now = millis();
-    if (now - last_log_time > 30000) {
-      ESP_LOGD(TAG, "No data available in buffer (waiting for continuous frames)");
-      last_log_time = now;
-    }
+
+  // Validate start byte
+  if (frame[0] != 0x16) {
+    ESP_LOGW(TAG, "Invalid start byte: 0x%02X", frame[0]);
+    return;
+  }
+
+  // Validate checksum
+  uint8_t expected_checksum = cm1106_checksum_(frame, sizeof(frame));
+  if (frame[7] != expected_checksum) {
+    ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", expected_checksum, frame[7]);
+    return;
+  }
+
+  this->status_clear_warning();
+
+  // Extract CO2 value - sensor sends continuous frame with CO2 at bytes 3-4
+  // Continuous frame format: [0x16][CMD_ECHO][0x50][CO2H][CO2L][DF3][DF4][CS]
+  uint16_t co2 = (frame[3] << 8) | frame[4];
+  uint8_t status = frame[5];
+  uint8_t info = frame[6];
+
+  ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
+
+  if (this->co2_sensor_ != nullptr) {
+    this->co2_sensor_->publish_state(co2);
   }
 }
 
