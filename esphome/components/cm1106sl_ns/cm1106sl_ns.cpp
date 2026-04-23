@@ -167,18 +167,17 @@ uint8_t CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *response, size_t 
     return this->read_array(response, response_len);
   }
 
-  time_t start_t, end_t;
-  time(&start_t); end_t = start_t;
+  uint32_t start_time = millis();
+  uint32_t timeout_ms = timeout_seconds * 1000;
   bool readed = false;
   
   uint8_t nb = 0;
-  while ((difftime(end_t, start_t) <= timeout_seconds) && !readed)  {
-    if (this->available()) {
+  while ((millis() - start_time <= timeout_ms) && !readed)  {
+    if (this->available()>= response_len) {
       nb = this->read_array(response, response_len);
       readed = true;
     }
     delay(10);  // Small delay to avoid busy waiting
-    time(&end_t);
   }
   
   if (!readed) {
