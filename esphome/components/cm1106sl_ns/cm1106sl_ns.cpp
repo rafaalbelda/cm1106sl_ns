@@ -251,7 +251,7 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   
   ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x51 0x%02X", cmd[3]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[5] = {0};
   if(this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
@@ -300,7 +300,7 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
   ESP_LOGD(TAG, "Sending SET mode command to %s: 0x11 0x02 0x51 0x%02X 0x%02X", 
            mode_str, mode, cmd[4]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[4] = {0};
   if (this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
@@ -344,7 +344,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   
   ESP_LOGD(TAG, "Sending GET software version command: 0x11 0x01 0x1E 0x%02X", cmd[3]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[15] = {0};
   if (this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
@@ -394,7 +394,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   
   ESP_LOGD(TAG, "Sending GET serial number command: 0x11 0x01 0x1F 0x%02X", cmd[3]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[14] = {0};
   if(this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
@@ -443,7 +443,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[8] = {0};
   if(this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
@@ -489,7 +489,7 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   ESP_LOGD(TAG, "Sending SET measurement period command: 0x11 0x04 0x50 0x%02X 0x%02X 0x%02X 0x%02X", 
            period_h, period_l, smoothing, cmd[6]);
   
-  this->cm1106_write_command_(cmd, sizeof(cmd))
+  this->cm1106_write_command_(cmd, sizeof(cmd));
 
   uint8_t response[4] = {0};
   if(this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
