@@ -172,18 +172,19 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
 
 bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   // Get current working mode from sensor
-  // Command: [0x11][0x01][0x00][CS] (4 bytes)
-  // Response: [0x16][0x02][0x00][MODE][CS] (5 bytes)
+  // Reference: UART_COMMUNICATION.md - Comando GET working status (0x51)
+  // Command: [0x11][0x01][0x51][CS] (4 bytes)
+  // Response: [0x16][0x02][0x51][MODE][CS] (5 bytes)
   // MODE: 0x00 = Single Measurement, 0x01 = Continuous Measurement
   
   if (mode == nullptr) {
     return false;
   }
   
-  uint8_t cmd[4] = {0x11, 0x01, 0x00, 0x00};
+  uint8_t cmd[4] = {0x11, 0x01, 0x51, 0x00};  // Comando correcto: 0x51
   cmd[3] = this->cm1106_checksum_(cmd, 4);
   
-  ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x00 0x%02X", cmd[3]);
+  ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x51 0x%02X", cmd[3]);
   
   uint8_t response[5] = {0};
   if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
@@ -191,8 +192,8 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
     return false;
   }
   
-  // Validate response: [0x16][0x02][0x00][MODE][CS]
-  if (response[0] != 0x16 || response[1] != 0x02 || response[2] != 0x00) {
+  // Validate response: [0x16][0x02][0x51][MODE][CS]
+  if (response[0] != 0x16 || response[1] != 0x02 || response[2] != 0x51) {  // Echo correcto: 0x51
     ESP_LOGW(TAG, "Invalid GET mode response: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2], response[3], response[4]);
     return false;
@@ -213,8 +214,9 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
 
 bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
   // Set working mode on sensor
-  // Command: [0x11][0x01][0x00][MODE][CS] (5 bytes)
-  // Response: [0x16][0x01][0x00][CS] (4 bytes)
+  // Reference: UART_COMMUNICATION.md - Comando SET working status (0x51)
+  // Command: [0x11][0x02][0x51][MODE][CS] (5 bytes)  ← Longitud=0x02, Comando=0x51
+  // Response: [0x16][0x01][0x51][CS] (4 bytes)        ← Echo=0x51
   // MODE: 0x00 = Single Measurement, 0x01 = Continuous Measurement
   
   if (mode != 0x00 && mode != 0x01) {
@@ -222,11 +224,11 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
     return false;
   }
   
-  uint8_t cmd[5] = {0x11, 0x01, 0x00, mode, 0x00};
+  uint8_t cmd[5] = {0x11, 0x02, 0x51, mode, 0x00};  // Longitud=0x02, Comando=0x51
   cmd[4] = this->cm1106_checksum_(cmd, 5);
   
   const char *mode_str = (mode == 0x00) ? "Single Measurement" : "Continuous Measurement";
-  ESP_LOGD(TAG, "Sending SET mode command to %s: 0x11 0x01 0x00 0x%02X 0x%02X", 
+  ESP_LOGD(TAG, "Sending SET mode command to %s: 0x11 0x02 0x51 0x%02X 0x%02X", 
            mode_str, mode, cmd[4]);
   
   uint8_t response[4] = {0};
@@ -235,8 +237,8 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
     return false;
   }
   
-  // Validate response: [0x16][0x01][0x00][CS]
-  if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x00) {
+  // Validate response: [0x16][0x01][0x51][CS]
+  if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x51) {  // Echo correcto: 0x51
     ESP_LOGW(TAG, "Invalid SET mode response: 0x%02X 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2], response[3]);
     return false;
