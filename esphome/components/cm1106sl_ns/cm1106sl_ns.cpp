@@ -462,9 +462,10 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   // Validate checksum
   uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  
   if (response[6] != expected_cs) {
     ESP_LOGW(TAG, "Measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
-             expected_cs, response[7]);
+             expected_cs, response[6]);
     return false;
   }
   
