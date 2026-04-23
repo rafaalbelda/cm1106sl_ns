@@ -25,7 +25,8 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint16_t config_period_s_ = 4;         // config period in seconds (1-65535s)
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
 
-  bool cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response, size_t response_len);
+  void cm1106_write_command_(const uint8_t *command, size_t command_len);
+  bool cm1106_serial_read_bytes(uint8_t *response, size_t response_len, uint8_t timeout_seconds);
   uint8_t cm1106_checksum_(const uint8_t *response, size_t len);
   bool cm1106_get_working_status_(uint8_t *mode);
   bool cm1106_set_working_status_(uint8_t mode);
