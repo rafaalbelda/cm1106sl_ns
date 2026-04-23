@@ -361,7 +361,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
 bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8_t *smoothing) {
   // Get measurement period and smoothing samples from sensor
   // Command: [0x11][0x01][0x50][CS] (4 bytes)
-  // Response: [0x16][0x03][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS] (7 bytes)
+  // Response: [0x16][0x04][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS] (8 bytes)
   
   if (period == nullptr || smoothing == nullptr) {
     return false;
@@ -372,14 +372,14 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
   
-  uint8_t response[7] = {0};
+  uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
     ESP_LOGE(TAG, "Failed to read measurement period");
     return false;
   }
   
-  // Validate response: [0x16][0x03][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS]
-  if (response[0] != 0x16 || response[1] != 0x03 || response[2] != 0x50) {
+  // Validate response: [0x16][0x04][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS]
+  if (response[0] != 0x16 || response[1] != 0x04 || response[2] != 0x50) {
     ESP_LOGW(TAG, "Invalid measurement period response: 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2]);
     return false;
@@ -387,9 +387,9 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   // Validate checksum
   uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
-  if (response[6] != expected_cs) {
+  if (response[7] != expected_cs) {
     ESP_LOGW(TAG, "Measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
-             expected_cs, response[6]);
+             expected_cs, response[7]);
     return false;
   }
   

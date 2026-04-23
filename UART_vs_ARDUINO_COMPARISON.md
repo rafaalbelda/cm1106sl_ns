@@ -585,7 +585,7 @@ bool cm1106_set_working_status_(uint8_t mode) {
 | `get_working_status(mode)` | 0x11 0x01 0x51 [CS] | 0x16 0x02 0x51 [MODE] [CS] | **CRÍTICO: Detectar modo** |
 | `set_working_status(mode)` | 0x11 0x02 0x51 [MODE] [CS] | 0x16 0x01 0x51 [CS] | **CRÍTICO: Activar continuo** |
 | `set_measurement_period()` | 0x11 0x04 0x50 [PH] [PL] [SM] [CS] | 0x16 0x01 0x50 [CS] | Configurar período (1-65535s) |
-| `get_measurement_period()` | 0x11 0x01 0x50 [CS] | 0x16 0x03 0x50 [PH] [PL] [SM] [CS] | Leer configuración actual |
+| `get_measurement_period()` | 0x11 0x01 0x50 [CS] | 0x16 0x04 0x50 [PH] [PL] [SM] [CS] | Leer configuración actual |
 | `get_software_version()` | 0x11 0x01 0x1E [CS] | Variable (15 bytes típicamente) | Validar sensor es SL-NS |
 | `get_serial_number()` | 0x11 0x01 0x1F [CS] | Variable (14 bytes) | Identificar unidad |
 | `get_ABC()` | 0x11 0x01 0x0F [CS] | 0x16 0x06 0x0F [data] [CS] | Leer calibración automática |
