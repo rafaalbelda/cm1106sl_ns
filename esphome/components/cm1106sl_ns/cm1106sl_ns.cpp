@@ -444,6 +444,8 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   this->cm1106_write_command_(cmd, sizeof(cmd));
 
+  delay (10); // Esperamos un poco para que el sensor responda, ya que tarda unos 5-10ms en responder
+
   uint8_t response[7] = {0};
   if(this->cm1106_serial_read_bytes(response, sizeof(response), 5) == 0) {
   //if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
