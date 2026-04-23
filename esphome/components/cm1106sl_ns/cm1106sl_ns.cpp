@@ -160,7 +160,7 @@ void CM1106SLNSComponent::update() {
 
 bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len, 
                                                 uint8_t *response, size_t response_len) {
-  // Clear RX buffer
+  // Clear RX buffer completely
   while (this->available()) {
     this->read();
   }
@@ -173,8 +173,29 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   if (response == nullptr)
     return true;
 
-  // Read response
-  return this->read_array(response, response_len);
+  // Wait a bit for response to start arriving (sensor response time ~5-10ms)
+  delay(20);
+  
+  // Synchronize: discard any junk bytes until we find 0x16 (response start marker)
+  uint32_t sync_timeout = millis() + 100;
+  while (millis() < sync_timeout) {
+    if (!this->available()) {
+      delayMicroseconds(100);
+      continue;
+    }
+    
+    uint8_t byte = this->read();
+    if (byte == 0x16) {
+      // Found response start marker
+      response[0] = byte;
+      // Read the rest of the response
+      return this->read_array(&response[1], response_len - 1);
+    }
+    // Discard junk bytes and keep looking for 0x16
+  }
+  
+  ESP_LOGW(TAG, "Timeout waiting for response marker (0x16)");
+  return false;
 }
 
 bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
