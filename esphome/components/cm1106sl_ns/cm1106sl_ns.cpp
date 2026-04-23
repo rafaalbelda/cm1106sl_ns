@@ -130,9 +130,9 @@ void CM1106SLNSComponent::update() {
 
   // Extract CO2 value - sensor sends continuous frame with CO2 at bytes 3-4
   // Continuous frame format: [0x16][CMD_ECHO][0x50][CO2H][CO2L][DF3][DF4][CS]
-  uint16_t co2 = (frame[3] << 8) | frame[4];
-  uint8_t status = frame[5];
-  uint8_t info = frame[6];
+  uint16_t co2 = (response[3] << 8) | response[4];
+  uint8_t status = response[5];
+  uint8_t info = response[6];
 
   ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
 
