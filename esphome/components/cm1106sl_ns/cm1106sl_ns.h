@@ -29,6 +29,10 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint8_t cm1106_checksum_(const uint8_t *response, size_t len);
   bool cm1106_get_working_status_(uint8_t *mode);
   bool cm1106_set_working_status_(uint8_t mode);
+  bool cm1106_get_software_version_(char *version, size_t len);
+  bool cm1106_get_serial_number_(char *serial, size_t len);
+  bool cm1106_get_measurement_period_(uint16_t *period, uint8_t *smoothing);
+  bool cm1106_set_measurement_period_(uint16_t period, uint8_t smoothing);
 };
 
 }  // namespace cm1106sl_ns

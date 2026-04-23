@@ -21,6 +21,23 @@ void CM1106SLNSComponent::setup() {
   
   ESP_LOGCONFIG(TAG, "=== CM1106SL-NS Setup ===");
   
+  // Step 0: Read sensor identification (version and serial number)
+  ESP_LOGCONFIG(TAG, "Step 0: Reading sensor information...");
+  
+  char version_buf[16] = {0};
+  if (this->cm1106_get_software_version_(version_buf, sizeof(version_buf))) {
+    ESP_LOGCONFIG(TAG, "  Software Version: %s", version_buf);
+  } else {
+    ESP_LOGW(TAG, "  Failed to read software version");
+  }
+  
+  char serial_buf[32] = {0};
+  if (this->cm1106_get_serial_number_(serial_buf, sizeof(serial_buf))) {
+    ESP_LOGCONFIG(TAG, "  Serial Number: %s", serial_buf);
+  } else {
+    ESP_LOGW(TAG, "  Failed to read serial number");
+  }
+  
   // Step 1: Detect current working mode
   ESP_LOGCONFIG(TAG, "Step 1: Detecting sensor working mode...");
   uint8_t current_mode = 0xFF;
@@ -49,47 +66,37 @@ void CM1106SLNSComponent::setup() {
     ESP_LOGCONFIG(TAG, "Step 2: Already in continuous mode - skipping mode change");
   }
   
-  // Step 3: Configure period and smoothing (only if in continuous mode)
-  ESP_LOGCONFIG(TAG, "Step 3: Configuring continuous mode: period=%us, smoothing=%u samples", 
-                this->config_period_s_, this->smoothing_samples_);
+  // Step 3: Read current measurement period and smoothing settings
+  ESP_LOGCONFIG(TAG, "Step 3: Reading current measurement configuration...");
+  uint16_t current_period = 0;
+  uint8_t current_smoothing = 0;
   
-  // Build configuration command: [0x11][0x04][0x50][DF1][DF2][DF3][CS]
-  // DF1 = Period_s / 256 (MSB)
-  // DF2 = Period_s % 256 (LSB)
-  // DF3 = Smoothing samples
-  uint8_t df1 = this->config_period_s_ / 256;
-  uint8_t df2 = this->config_period_s_ % 256;
-  uint8_t df3 = this->smoothing_samples_;
-  
-  uint8_t cmd[7] = {0x11, 0x04, 0x50, df1, df2, df3, 0x00};
-  cmd[6] = this->cm1106_checksum_(cmd, 7);
-  
-  ESP_LOGCONFIG(TAG, "Sending config command: 0x11 0x04 0x50 0x%02X 0x%02X 0x%02X 0x%02X", 
-                df1, df2, df3, cmd[6]);
-  
-  uint8_t response[4] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
-    ESP_LOGE(TAG, "Failed to send configuration command");
-    this->mark_failed();
-    return;
-  }
-  
-  // Check response: should be [0x16][0x01][0x50][CS]
-  if (response[0] == 0x16 && response[1] == 0x01 && response[2] == 0x50) {
-    uint8_t expected_cs = this->cm1106_checksum_(response, 4);
-    if (response[3] == expected_cs) {
-      ESP_LOGCONFIG(TAG, "Configuration successful - sensor ready for continuous data streaming");
-    } else {
-      ESP_LOGW(TAG, "Configuration response checksum mismatch: expected 0x%02X, got 0x%02X", 
-               expected_cs, response[3]);
-    }
+  if (!this->cm1106_get_measurement_period_(&current_period, &current_smoothing)) {
+    ESP_LOGW(TAG, "Failed to read current measurement period");
   } else {
-    ESP_LOGW(TAG, "Unexpected configuration response: 0x%02X 0x%02X 0x%02X 0x%02X", 
-             response[0], response[1], response[2], response[3]);
+    ESP_LOGCONFIG(TAG, "Current settings: period=%u seconds, smoothing=%u samples", 
+                  current_period, current_smoothing);
   }
   
-  ESP_LOGCONFIG(TAG, "Setup complete - waiting for continuous data frames");
+  // Step 4: Update period and smoothing only if different from current values
+  if (current_period != this->config_period_s_ || current_smoothing != this->smoothing_samples_) {
+    ESP_LOGCONFIG(TAG, "Step 4: Configuration differs - updating sensor settings...");
+    ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", 
+                  this->config_period_s_, this->smoothing_samples_);
+    
+    if (!this->cm1106_set_measurement_period_(this->config_period_s_, this->smoothing_samples_)) {
+      ESP_LOGE(TAG, "Failed to update measurement period");
+      this->mark_failed();
+      return;
+    }
+    ESP_LOGCONFIG(TAG, "Configuration updated successfully");
+  } else {
+    ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
+  }
+  
+  ESP_LOGCONFIG(TAG, "Setup complete - sensor ready for continuous data streaming");
 }
+
 
 void CM1106SLNSComponent::update() {
   // In continuous mode, sensor automatically sends 8-byte data frames
@@ -256,20 +263,197 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
   return true;
 }
 
+bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len) {
+  // Get software version from sensor
+  // Command: [0x11][0x01][0x1E][CS] (4 bytes)
+  // Response: [0x16][0x0C][0x1E][VERSION_DATA...][CS] (15 bytes total)
+  
+  if (version == nullptr || len == 0) {
+    return false;
+  }
+  
+  memset(version, 0, len);
+  
+  uint8_t cmd[4] = {0x11, 0x01, 0x1E, 0x00};  // Comando: 0x1E (GET_SOFTWARE_VERSION)
+  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  
+  ESP_LOGD(TAG, "Sending GET software version command: 0x11 0x01 0x1E 0x%02X", cmd[3]);
+  
+  uint8_t response[15] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to read software version");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x0C][0x1E][VERSION...][CS]
+  if (response[0] != 0x16 || response[1] != 0x0C || response[2] != 0x1E) {
+    ESP_LOGW(TAG, "Invalid software version response: 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  if (response[14] != expected_cs) {
+    ESP_LOGW(TAG, "Software version response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[14]);
+    return false;
+  }
+  
+  // Extract version string from bytes 3-12 (10 bytes max)
+  size_t copy_len = (len - 1 < 10) ? len - 1 : 10;
+  strncpy(version, (const char *)&response[3], copy_len);
+  version[copy_len] = '\0';
+  
+  ESP_LOGD(TAG, "GET software version: %s", version);
+  return true;
+}
+
+bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
+  // Get serial number from sensor
+  // Command: [0x11][0x01][0x1F][CS] (4 bytes)
+  // Response: [0x16][0x0B][0x1F][SN_DATA...][CS] (14 bytes total)
+  // Serial number is formatted as 5 groups of 4 digits
+  
+  if (serial == nullptr || len == 0) {
+    return false;
+  }
+  
+  memset(serial, 0, len);
+  
+  uint8_t cmd[4] = {0x11, 0x01, 0x1F, 0x00};  // Comando: 0x1F (GET_SERIAL_NUMBER)
+  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  
+  ESP_LOGD(TAG, "Sending GET serial number command: 0x11 0x01 0x1F 0x%02X", cmd[3]);
+  
+  uint8_t response[14] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to read serial number");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x0B][0x1F][SN_DATA...][CS]
+  if (response[0] != 0x16 || response[1] != 0x0B || response[2] != 0x1F) {
+    ESP_LOGW(TAG, "Invalid serial number response: 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  if (response[13] != expected_cs) {
+    ESP_LOGW(TAG, "Serial number response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[13]);
+    return false;
+  }
+  
+  // Extract serial number: 5 groups of 4 digits from 10 bytes (2 bytes per group)
+  size_t pos = 0;
+  for (int i = 0; i < 5 && pos + 4 < len; i++) {
+    uint16_t sn_part = ((response[3 + 2*i] & 0xFF) << 8) | (response[4 + 2*i] & 0xFF);
+    pos += snprintf(&serial[pos], len - pos, "%04u", sn_part);
+  }
+  
+  ESP_LOGD(TAG, "GET serial number: %s", serial);
+  return true;
+}
+
+bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8_t *smoothing) {
+  // Get measurement period and smoothing samples from sensor
+  // Command: [0x11][0x01][0x50][CS] (4 bytes)
+  // Response: [0x16][0x03][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS] (7 bytes)
+  
+  if (period == nullptr || smoothing == nullptr) {
+    return false;
+  }
+  
+  uint8_t cmd[4] = {0x11, 0x01, 0x50, 0x00};  // Comando: 0x50 (MEASUREMENT_PERIOD GET)
+  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  
+  ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
+  
+  uint8_t response[7] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to read measurement period");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x03][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS]
+  if (response[0] != 0x16 || response[1] != 0x03 || response[2] != 0x50) {
+    ESP_LOGW(TAG, "Invalid measurement period response: 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  if (response[6] != expected_cs) {
+    ESP_LOGW(TAG, "Measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[6]);
+    return false;
+  }
+  
+  // Extract period (16-bit value, MSB first) and smoothing
+  *period = (response[3] << 8) | response[4];
+  *smoothing = response[5];
+  
+  ESP_LOGD(TAG, "GET measurement period: period=%u seconds, smoothing=%u samples", *period, *smoothing);
+  return true;
+}
+
+bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_t smoothing) {
+  // Set measurement period and smoothing samples
+  // Command: [0x11][0x04][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS] (7 bytes)
+  // Response: [0x16][0x01][0x50][CS] (4 bytes)
+  
+  uint8_t period_h = (period >> 8) & 0xFF;
+  uint8_t period_l = period & 0xFF;
+  
+  uint8_t cmd[7] = {0x11, 0x04, 0x50, period_h, period_l, smoothing, 0x00};
+  cmd[6] = this->cm1106_checksum_(cmd, 7);
+  
+  ESP_LOGD(TAG, "Sending SET measurement period command: 0x11 0x04 0x50 0x%02X 0x%02X 0x%02X 0x%02X", 
+           period_h, period_l, smoothing, cmd[6]);
+  
+  uint8_t response[4] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGE(TAG, "Failed to set measurement period");
+    return false;
+  }
+  
+  // Validate response: [0x16][0x01][0x50][CS]
+  if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x50) {
+    ESP_LOGW(TAG, "Invalid SET measurement period response: 0x%02X 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2], response[3]);
+    return false;
+  }
+  
+  // Validate checksum
+  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  if (response[3] != expected_cs) {
+    ESP_LOGW(TAG, "SET measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[3]);
+    return false;
+  }
+  
+  ESP_LOGD(TAG, "SET measurement period: period=%u seconds, smoothing=%u samples", period, smoothing);
+  return true;
+}
+
 void CM1106SLNSComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS (Continuous Mode):");
   LOG_SENSOR("  ", "CO2", this->co2_sensor_);
   ESP_LOGCONFIG(TAG, "  Config Period: %u seconds", this->config_period_s_);
   ESP_LOGCONFIG(TAG, "  Smoothing Samples: %u", this->smoothing_samples_);
   this->check_uart_settings(9600);
-    if (this->is_failed()) {
+  if (this->is_failed()) {
     ESP_LOGE(TAG, "Failed connecting to sensor");
+  } else {
+    ESP_LOGCONFIG(TAG, "Sensor connection successful");
+
+    // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
+    this->setup();
   }
-
-  // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
-  ESP_LOGE(TAG, "Setup:");
-  this->setup();
-
 
 }
 
