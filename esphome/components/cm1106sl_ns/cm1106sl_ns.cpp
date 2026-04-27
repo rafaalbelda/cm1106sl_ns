@@ -5,8 +5,6 @@ namespace esphome {
 namespace cm1106sl_ns {
 
 static const char *const TAG = "cm1106sl_ns";
-static const uint8_t CM1106_TIMEOUT = 5;     // Timeout for communication
-
 
 uint8_t CM1106SLNSComponent::cm1106_checksum_(const uint8_t *response, size_t len) {
   // Two's complement checksum: sum all bytes except checksum, then (~sum) + 1
@@ -150,7 +148,7 @@ void CM1106SLNSComponent::update() {
 }
 
 
-uint8_t CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *response, size_t response_len, uint8_t timeout_seconds = CM1106_TIMEOUT) {
+uint8_t CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *response, size_t response_len, uint8_t timeout_seconds) {
   // Read bytes from UART with timeout
   // Returns number of bytes read, or 0 on timeout/error
   
