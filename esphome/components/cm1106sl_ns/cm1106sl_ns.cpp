@@ -140,7 +140,7 @@ void CM1106SLNSComponent::update() {
   uint8_t status = response[5];
   uint8_t info = response[6];
 
-  ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
+  ESP_LOGD(TAG, "CO2=%u ppm, Status=0x%02X, Info=0x%02X", co2, status, info);
 
   if (this->co2_sensor_ != nullptr) {
     this->co2_sensor_->publish_state(co2);
@@ -520,7 +520,7 @@ void CM1106SLNSComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "Sensor connection successful");
 
     // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
-    this->setup();
+    //this->setup();
   }
 
 }
