@@ -21,3 +21,14 @@ cm1106/cm1106.h
 cm1106/sensor.py
 arduino/cm1106_uart.cpp
 arduino/cm1106_uart.h
+bak/CM1106SL-NS.md
+bak/ESPHOME_CONTINUOUS_MODE_IMPLEMENTATION.md
+bak/README.md
+bak/UART_COMMUNICATION.md
+bak/UART_vs_ARDUINO_COMPARISON.md
+bak/cm1106sl_ns/__init__.py
+bak/cm1106sl_ns/cm1106sl_ns.cpp
+bak/cm1106sl_ns/cm1106sl_ns.h
+bak/cm1106sl_ns/manifest.json
+bak/cm1106sl_ns/sensor.py
+.gitignore
