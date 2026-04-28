@@ -74,8 +74,8 @@ void CM1106SLNSComponent::setupCM1106_() {
       ESP_LOGCONFIG(TAG, "  Current mode: %s (0x%02X)", mode_str, current_mode);
 
       // Step 2: Switch to continuous mode if not already in it
+      ESP_LOGCONFIG(TAG, "Step 2: Switching to continuous mode...");
       if (current_mode != 0x01) {  // 0x01 = Continuous Measurement
-        ESP_LOGCONFIG(TAG, "Step 2: Switching to continuous mode...");
         if (!this->cm1106_set_working_status_(0x01)) {
           ESP_LOGE(TAG, "Failed to set continuous mode");
           this->mark_failed();
@@ -89,7 +89,7 @@ void CM1106SLNSComponent::setupCM1106_() {
       this->initialized0_ = true;
     }
     
-    if (!this->initialized1_ > 0) {
+    if (this->initialized1_ > 0) {
       // Step 3: Read current measurement period and smoothing settings
       ESP_LOGCONFIG(TAG, "Step 3: Reading current measurement configuration...");
       uint16_t current_period = 0;
