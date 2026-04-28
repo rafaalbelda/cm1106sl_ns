@@ -21,88 +21,99 @@ uint8_t cm1106_checksum(const uint8_t *response, size_t len) {
 }
 
 void CM1106SLNSComponent::setup() {
-  // Initialization: First detect and set working mode to continuous, then configure period/smoothing
-  // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
-  
-  ESP_LOGCONFIG(TAG, "=== CM1106SL-NS Setup ===");
-  
-  // Step 0: Read sensor identification (version and serial number)
-  ESP_LOGCONFIG(TAG, "Step 0: Reading sensor information...");
-  
-  char version_buf[16] = {0};
-  if (this->cm1106_get_software_version_(version_buf, sizeof(version_buf))) {
-    ESP_LOGCONFIG(TAG, "  Software Version: %s", version_buf);
-  } else {
-    ESP_LOGW(TAG, "  Failed to read software version");
-  }
-  
-  char serial_buf[32] = {0};
-  if (this->cm1106_get_serial_number_(serial_buf, sizeof(serial_buf))) {
-    ESP_LOGCONFIG(TAG, "  Serial Number: %s", serial_buf);
-  } else {
-    ESP_LOGW(TAG, "  Failed to read serial number");
-  }
-  
-  // Step 1: Detect current working mode
-  ESP_LOGCONFIG(TAG, "Step 1: Detecting sensor working mode...");
-  uint8_t current_mode = 0xFF;
-  if (!this->cm1106_get_working_status_(&current_mode)) {
-    ESP_LOGE(TAG, "Failed to detect sensor working mode");
+  // Initialization moved to update() on first call
+  uint8_t response[8] = {0};
+  if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
+    ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
     this->mark_failed();
     return;
   }
-  
-  // Display detected mode
-  const char *mode_str = (current_mode == 0x00) ? "Single Measurement" : 
-                         (current_mode == 0x01) ? "Continuous Measurement" : 
-                         "Unknown/Invalid";
-  ESP_LOGCONFIG(TAG, "Current mode: %s (0x%02X)", mode_str, current_mode);
-  
-  // Step 2: Switch to continuous mode if not already in it
-  if (current_mode != 0x01) {  // 0x01 = Continuous Measurement
-    ESP_LOGCONFIG(TAG, "Step 2: Switching to continuous mode...");
-    if (!this->cm1106_set_working_status_(0x01)) {
-      ESP_LOGE(TAG, "Failed to set continuous mode");
-      this->mark_failed();
-      return;
-    }
-    ESP_LOGCONFIG(TAG, "Successfully changed to continuous mode");
-  } else {
-    ESP_LOGCONFIG(TAG, "Step 2: Already in continuous mode - skipping mode change");
-  }
-  
-  // Step 3: Read current measurement period and smoothing settings
-  ESP_LOGCONFIG(TAG, "Step 3: Reading current measurement configuration...");
-  uint16_t current_period = 0;
-  uint8_t current_smoothing = 0;
-  
-  if (!this->cm1106_get_measurement_period_(&current_period, &current_smoothing)) {
-    ESP_LOGW(TAG, "Failed to read current measurement period");
-  } else {
-    ESP_LOGCONFIG(TAG, "Current settings: period=%u seconds, smoothing=%u samples", 
-                  current_period, current_smoothing);
-  }
-  
-  // Step 4: Update period and smoothing only if different from current values
-  if (current_period != this->config_period_s_ || current_smoothing != this->smoothing_samples_) {
-    ESP_LOGCONFIG(TAG, "Step 4: Configuration differs - updating sensor settings...");
-    ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", 
-                  this->config_period_s_, this->smoothing_samples_);
-    
-    if (!this->cm1106_set_measurement_period_(this->config_period_s_, this->smoothing_samples_)) {
-      ESP_LOGE(TAG, "Failed to update measurement period");
-      this->mark_failed();
-      return;
-    }
-    ESP_LOGCONFIG(TAG, "Configuration updated successfully");
-  } else {
-    ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
-  }
-  
-  ESP_LOGCONFIG(TAG, "Setup complete - sensor ready for continuous data streaming");
 }
 
 void CM1106SLNSComponent::update() {
+  if (!this->initialized_) {
+    // Initialization: First detect and set working mode to continuous, then configure period/smoothing
+    // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
+    
+    ESP_LOGCONFIG(TAG, "=== CM1106SL-NS Initialization ===");
+    
+    // Step 0: Read sensor identification (version and serial number)
+    ESP_LOGCONFIG(TAG, "Step 0: Reading sensor information...");
+    
+    char version_buf[16] = {0};
+    if (this->cm1106_get_software_version_(version_buf, sizeof(version_buf))) {
+      ESP_LOGCONFIG(TAG, "  Software Version: %s", version_buf);
+    } else {
+      ESP_LOGW(TAG, "  Failed to read software version");
+    }
+    
+    char serial_buf[32] = {0};
+    if (this->cm1106_get_serial_number_(serial_buf, sizeof(serial_buf))) {
+      ESP_LOGCONFIG(TAG, "  Serial Number: %s", serial_buf);
+    } else {
+      ESP_LOGW(TAG, "  Failed to read serial number");
+    }
+    
+    // Step 1: Detect current working mode
+    ESP_LOGCONFIG(TAG, "Step 1: Detecting sensor working mode...");
+    uint8_t current_mode = 0xFF;
+    if (!this->cm1106_get_working_status_(&current_mode)) {
+      ESP_LOGE(TAG, "Failed to detect sensor working mode");
+      this->mark_failed();
+      return;
+    }
+    
+    // Display detected mode
+    const char *mode_str = (current_mode == 0x00) ? "Single Measurement" : 
+                           (current_mode == 0x01) ? "Continuous Measurement" : 
+                           "Unknown/Invalid";
+    ESP_LOGCONFIG(TAG, "Current mode: %s (0x%02X)", mode_str, current_mode);
+    
+    // Step 2: Switch to continuous mode if not already in it
+    if (current_mode != 0x01) {  // 0x01 = Continuous Measurement
+      ESP_LOGCONFIG(TAG, "Step 2: Switching to continuous mode...");
+      if (!this->cm1106_set_working_status_(0x01)) {
+        ESP_LOGE(TAG, "Failed to set continuous mode");
+        this->mark_failed();
+        return;
+      }
+      ESP_LOGCONFIG(TAG, "Successfully changed to continuous mode");
+    } else {
+      ESP_LOGCONFIG(TAG, "Step 2: Already in continuous mode - skipping mode change");
+    }
+    
+    // Step 3: Read current measurement period and smoothing settings
+    ESP_LOGCONFIG(TAG, "Step 3: Reading current measurement configuration...");
+    uint16_t current_period = 0;
+    uint8_t current_smoothing = 0;
+    
+    if (!this->cm1106_get_measurement_period_(&current_period, &current_smoothing)) {
+      ESP_LOGW(TAG, "Failed to read current measurement period");
+    } else {
+      ESP_LOGCONFIG(TAG, "Current settings: period=%u seconds, smoothing=%u samples", 
+                    current_period, current_smoothing);
+    }
+    
+    // Step 4: Update period and smoothing only if different from current values
+    if (current_period != this->config_period_s_ || current_smoothing != this->smoothing_samples_) {
+      ESP_LOGCONFIG(TAG, "Step 4: Configuration differs - updating sensor settings...");
+      ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", 
+                    this->config_period_s_, this->smoothing_samples_);
+      
+      if (!this->cm1106_set_measurement_period_(this->config_period_s_, this->smoothing_samples_)) {
+        ESP_LOGE(TAG, "Failed to update measurement period");
+        this->mark_failed();
+        return;
+      }
+      ESP_LOGCONFIG(TAG, "Configuration updated successfully");
+    } else {
+      ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
+    }
+    
+    ESP_LOGCONFIG(TAG, "Initialization complete - sensor ready for continuous data streaming");
+    this->initialized_ = true;
+  }
+
   uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
     ESP_LOGW(TAG, "Reading data from CM1106 failed!");
@@ -576,7 +587,7 @@ void CM1106SLNSComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "Sensor connection successful");
 
     // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
-    this->setup();
+    //this->setup();
   }
 }
 
