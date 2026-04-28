@@ -330,7 +330,7 @@ void CM1106SLNSComponent::request_measurement_period_() {
   uint8_t cmd[4] = {0x11, 0x01, 0x50, 0x00};
   ESP_LOGD(TAG, "  Sending GET measurement period command: 0x11 0x01 0x50 0x%02X",
            cm1106_checksum(cmd, sizeof(cmd)));
-  this->start_transaction_(TransactionOperation::INIT_GET_MEASUREMENT_PERIOD, cmd, sizeof(cmd), 8);
+  this->start_transaction_(TransactionOperation::INIT_GET_MEASUREMENT_PERIOD, cmd, sizeof(cmd), 7);
 }
 
 void CM1106SLNSComponent::request_set_measurement_period_(uint16_t period, uint8_t smoothing) {
@@ -448,7 +448,7 @@ bool CM1106SLNSComponent::process_set_working_status_response_() {
 
 bool CM1106SLNSComponent::process_measurement_period_response_() {
   if (!this->validate_response_header_(0x04, 0x50, "measurement period") ||
-      !this->validate_response_checksum_("Measurement period", 8)) {
+      !this->validate_response_checksum_("Measurement period", 7)) {
     return false;
   }
 
