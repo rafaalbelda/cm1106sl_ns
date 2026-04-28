@@ -29,7 +29,7 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool initialized_ = false;
   bool initialized0_ = false;
-  uint8_t initialized1_ = 3;
+  bool initialized1_ = false;
 
 
   void setupCM1106_();
