@@ -5,7 +5,7 @@ namespace esphome {
 namespace cm1106sl_ns {
 
 static const char *const TAG = "cm1106sl_ns";
-static const uint32_t CM1106_SERIAL_READ_TIMEOUT_MS = 4000;
+//static const uint32_t CM1106_SERIAL_READ_TIMEOUT_MS = 4000;
 
 uint8_t CM1106SLNSComponent::cm1106_checksum_(const uint8_t *response, size_t len) {
   // Two's complement checksum: sum all bytes except checksum, then (~sum) + 1
@@ -98,122 +98,61 @@ void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setup complete - sensor ready for continuous data streaming");
 }
 
+// bool CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *buffer, size_t len, uint32_t timeout_ms) {
+//   if (buffer == nullptr || len == 0) {
+//     return false;
+//   }
 
-void CM1106SLNSComponent::update() {
-  // In continuous mode, sensor automatically sends 8-byte data frames
-  // Frame format: [0x16][CMD][0x50][CO2H][CO2L][DF3][DF4][CS]
-  // We read continuous frames from the UART buffer (no explicit read command needed)
-  
-  // Look for complete frame in buffer (8 bytes starting with 0x16)
-  while (this->available() >= 8) {
-    uint8_t response[8] = {0};
-    
-    // Find start byte (0x16)
-    uint8_t start_byte = this->read();
-    if (start_byte != 0x16) {
-      ESP_LOGD(TAG, "Skipping byte 0x%02X, waiting for frame start 0x16", start_byte);
-      continue;  // Keep looking for frame start
-    }
-    
-    // Read remaining 7 bytes
-    response[0] = start_byte;
-    if (!this->read_array(&response[1], 7)) {
-      ESP_LOGW(TAG, "Failed to read complete frame from buffer");
-      return;
-    }
-    
-    // Validate checksum
-  uint8_t expected_checksum = cm1106_checksum_(response, sizeof(response));
-  if (response[7] != expected_checksum) {
-    ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", expected_checksum, response[7]);
-    this->status_set_warning();
-    return;
-    }
-    
-    this->status_clear_warning();
-    
-    // Extract CO2 value - sensor sends continuous frame with CO2 at bytes 3-4
-    // Continuous frame format: [0x16][CMD_ECHO][0x50][CO2H][CO2L][DF3][DF4][CS]
-    uint16_t co2 = (response[3] << 8) | response[4];
-    uint8_t status = response[5];
-    uint8_t info = response[6];
-    
-    ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
-    
-    if (this->co2_sensor_ != nullptr) {
-      this->co2_sensor_->publish_state(co2);
-    }
-    
-    return;  // Frame processed successfully
-  }
-  
-  // No complete frame available yet
-  if (!this->available()) {
-    // Only log every 30 seconds to avoid spam
-    static uint32_t last_log_time = 0;
-    uint32_t now = millis();
-    if (now - last_log_time > 30000) {
-      ESP_LOGD(TAG, "No data available in buffer (waiting for continuous frames)");
-      last_log_time = now;
-    }
-  }
+//   uint32_t deadline = millis() + timeout_ms;
+
+//   // Synchronize: discard any junk bytes until we find 0x16 (response start marker)
+//   while (millis() < deadline) {
+//     if (!this->available()) {
+//       delay(100);
+//       continue;
+//     }
+
+//     uint8_t byte = this->read();
+//     if (byte != 0x16) {
+//       continue;
+//     }
+
+//     buffer[0] = byte;
+//     size_t idx = 1;
+//     while (idx < len && millis() < deadline) {
+//       if (!this->available()) {
+//         delay(100);
+//         continue;
+//       }
+//       buffer[idx++] = this->read();
+//     }
+
+//     return idx == len;
+//   }
+
+//   ESP_LOGW(TAG, "Timeout waiting for response marker (0x16)");
+//   return false;
 }
 
-bool CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *buffer, size_t len, uint32_t timeout_ms) {
-  if (buffer == nullptr || len == 0) {
-    return false;
-  }
+// bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len) {
+//   if (command == nullptr || command_len == 0) {
+//     return false;
+//   }
 
-  uint32_t deadline = millis() + timeout_ms;
+//   // Clear RX buffer completely
+//   while (this->available()) {
+//     this->read();
+//   }
 
-  // Synchronize: discard any junk bytes until we find 0x16 (response start marker)
-  while (millis() < deadline) {
-    if (!this->available()) {
-      delay(100);
-      continue;
-    }
+//   // Send command bytes excluding checksum placeholder
+//   this->write_array(command, command_len - 1);
+//   // Send checksum
+//   this->write_byte(cm1106_checksum_(command, command_len));
+//   // Ensure all bytes are sent
+//   this->flush();
 
-    uint8_t byte = this->read();
-    if (byte != 0x16) {
-      continue;
-    }
-
-    buffer[0] = byte;
-    size_t idx = 1;
-    while (idx < len && millis() < deadline) {
-      if (!this->available()) {
-        delay(100);
-        continue;
-      }
-      buffer[idx++] = this->read();
-    }
-
-    return idx == len;
-  }
-
-  ESP_LOGW(TAG, "Timeout waiting for response marker (0x16)");
-  return false;
-}
-
-bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len) {
-  if (command == nullptr || command_len == 0) {
-    return false;
-  }
-
-  // Clear RX buffer completely
-  while (this->available()) {
-    this->read();
-  }
-
-  // Send command bytes excluding checksum placeholder
-  this->write_array(command, command_len - 1);
-  // Send checksum
-  this->write_byte(cm1106_checksum_(command, command_len));
-  // Ensure all bytes are sent
-  this->flush();
-
-  return true;
-}
+//   return true;
+// }
 
 bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   // Get current working mode from sensor
@@ -232,19 +171,25 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x51 0x%02X", cmd[3]);
   
   uint8_t response[5] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send GET mode command");
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to read sensor working status!");
+    this->status_set_warning();
     return false;
   }
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read sensor working status");
-    return false;
-  }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send GET mode command");
+  //   return false;
+  // }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read sensor working status");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x02][0x51][MODE][CS]
   if (response[0] != 0x16 || response[1] != 0x02 || response[2] != 0x51) {  // Echo correcto: 0x51
     ESP_LOGW(TAG, "Invalid GET mode response: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2], response[3], response[4]);
+    this->status_set_warning();
     return false;
   }
   
@@ -253,10 +198,12 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   if (response[4] != expected_cs) {
     ESP_LOGW(TAG, "GET mode response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[4]);
+    this->status_set_warning();
     return false;
   }
   
   *mode = response[3];
+  this->status_clear_warning();
   ESP_LOGD(TAG, "GET mode response: mode=0x%02X", *mode);
   return true;
 }
@@ -281,31 +228,39 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
            mode_str, mode, cmd[4]);
   
   uint8_t response[4] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send SET mode command");
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to send SET working mode!");
+    this->status_set_warning();
     return false;
   }
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read SET mode response");
-    return false;
-  }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send SET mode command");
+  //   return false;
+  // }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read SET mode response");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x01][0x51][CS]
   if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x51) {  // Echo correcto: 0x51
-    ESP_LOGW(TAG, "Invalid SET mode response: 0x%02X 0x%02X 0x%02X 0x%02X",
+    ESP_LOGW(TAG, "Invalid SET working mode response: 0x%02X 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2], response[3]);
+    this->status_set_warning();
     return false;
   }
   
   // Validate checksum
   uint8_t expected_cs = this->cm1106_checksum_(response, 4);
   if (response[3] != expected_cs) {
-    ESP_LOGW(TAG, "SET mode response checksum mismatch: expected 0x%02X, got 0x%02X",
+    ESP_LOGW(TAG, "SET working mode response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[3]);
+    this->status_set_warning();
     return false;
   }
   
-  ESP_LOGD(TAG, "SET mode response: mode changed to %s", mode_str);
+  this->status_clear_warning();
+  ESP_LOGD(TAG, "SET working mode response: mode changed to %s", mode_str);
   return true;
 }
 
@@ -326,20 +281,26 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   ESP_LOGD(TAG, "Sending GET software version command: 0x11 0x01 0x1E 0x%02X", cmd[3]);
   
   uint8_t response[15] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send GET software version command");
-    return false;
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to read software version!");
+    this->status_set_warning();
+    return;
   }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send GET software version command");
+  //   return false;
+  // }
 
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read software version");
-    return false;
-  }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read software version");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x0C][0x1E][VERSION...][CS]
   if (response[0] != 0x16 || response[1] != 0x0C || response[2] != 0x1E) {
     ESP_LOGW(TAG, "Invalid software version response: 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2]);
+    this->status_set_warning();
     return false;
   }
   
@@ -348,6 +309,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   if (response[14] != expected_cs) {
     ESP_LOGW(TAG, "Software version response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[14]);
+    this->status_set_warning();
     return false;
   }
   
@@ -356,6 +318,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   strncpy(version, (const char *)&response[3], copy_len);
   version[copy_len] = '\0';
   
+  this->status_clear_warning();
   ESP_LOGD(TAG, "GET software version: %s", version);
   return true;
 }
@@ -378,19 +341,25 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   ESP_LOGD(TAG, "Sending GET serial number command: 0x11 0x01 0x1F 0x%02X", cmd[3]);
   
   uint8_t response[14] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send GET serial number command");
-    return false;
+    if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to read serial number!");
+    this->status_set_warning();
+    return;
   }
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read serial number");
-    return false;
-  }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send GET serial number command");
+  //   return false;
+  // }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read serial number");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x0B][0x1F][SN_DATA...][CS]
   if (response[0] != 0x16 || response[1] != 0x0B || response[2] != 0x1F) {
     ESP_LOGW(TAG, "Invalid serial number response: 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2]);
+    this->status_set_warning();
     return false;
   }
   
@@ -399,6 +368,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   if (response[13] != expected_cs) {
     ESP_LOGW(TAG, "Serial number response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[13]);
+    this->status_set_warning();
     return false;
   }
   
@@ -409,6 +379,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
     pos += snprintf(&serial[pos], len - pos, "%04u", sn_part);
   }
   
+  this->status_clear_warning();
   ESP_LOGD(TAG, "GET serial number: %s", serial);
   return true;
 }
@@ -428,19 +399,25 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
   
   uint8_t response[8] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send GET measurement period command");
-    return false;
+    if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to read measurement period!");
+    this->status_set_warning();
+    return;
   }
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read measurement period");
-    return false;
-  }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send GET measurement period command");
+  //   return false;
+  // }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read measurement period");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x04][0x50][PERIOD_H][PERIOD_L][SMOOTHING][CS]
   if (response[0] != 0x16 || response[1] != 0x04 || response[2] != 0x50) {
     ESP_LOGW(TAG, "Invalid measurement period response: 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2]);
+    this->status_set_warning();
     return false;
   }
   
@@ -449,6 +426,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   if (response[7] != expected_cs) {
     ESP_LOGW(TAG, "Measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[7]);
+    this->status_set_warning();
     return false;
   }
   
@@ -456,6 +434,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   *period = (response[3] << 8) | response[4];
   *smoothing = response[5];
   
+  this->status_clear_warning();
   ESP_LOGD(TAG, "GET measurement period: period=%u seconds, smoothing=%u samples", *period, *smoothing);
   return true;
 }
@@ -475,19 +454,25 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
            period_h, period_l, smoothing, cmd[6]);
   
   uint8_t response[4] = {0};
-  if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
-    ESP_LOGE(TAG, "Failed to send SET measurement period command");
-    return false;
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to SET measurement period!");
+    this->status_set_warning();
+    return;
   }
-  if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
-    ESP_LOGE(TAG, "Failed to read SET measurement period response");
-    return false;
-  }
+  // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
+  //   ESP_LOGE(TAG, "Failed to send SET measurement period command");
+  //   return false;
+  // }
+  // if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
+  //   ESP_LOGE(TAG, "Failed to read SET measurement period response");
+  //   return false;
+  // }
   
   // Validate response: [0x16][0x01][0x50][CS]
   if (response[0] != 0x16 || response[1] != 0x01 || response[2] != 0x50) {
     ESP_LOGW(TAG, "Invalid SET measurement period response: 0x%02X 0x%02X 0x%02X 0x%02X",
              response[0], response[1], response[2], response[3]);
+    this->status_set_warning();
     return false;
   }
   
@@ -496,10 +481,12 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   if (response[3] != expected_cs) {
     ESP_LOGW(TAG, "SET measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[3]);
+    this->status_set_warning();
     return false;
   }
   
   ESP_LOGD(TAG, "SET measurement period: period=%u seconds, smoothing=%u samples", period, smoothing);
+  this->status_clear_warning();
   return true;
 }
 
