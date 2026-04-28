@@ -330,6 +330,9 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
     ESP_LOGE(TAG, "Failed to send GET software version command");
     return false;
   }
+
+  delay(20);  // Short delay to allow sensor to prepare response
+
   if (!this->cm1106_serial_read_bytes(response, sizeof(response), CM1106_SERIAL_READ_TIMEOUT_MS)) {
     ESP_LOGE(TAG, "Failed to read software version");
     return false;
