@@ -170,7 +170,7 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   }
   
   uint8_t cmd[4] = {0x11, 0x01, 0x51, 0x00};  // Comando correcto: 0x51
-  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  cmd[3] = cm1106_checksum(cmd, 4);
   
   ESP_LOGD(TAG, "Sending GET mode command: 0x11 0x01 0x51 0x%02X", cmd[3]);
   
@@ -198,7 +198,7 @@ bool CM1106SLNSComponent::cm1106_get_working_status_(uint8_t *mode) {
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, 5);
+  uint8_t expected_cs = cm1106_checksum(response, 5);
   if (response[4] != expected_cs) {
     ESP_LOGW(TAG, "GET mode response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[4]);
@@ -225,7 +225,7 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
   }
   
   uint8_t cmd[5] = {0x11, 0x02, 0x51, mode, 0x00};  // Longitud=0x02, Comando=0x51
-  cmd[4] = this->cm1106_checksum_(cmd, 5);
+  cmd[4] = cm1106_checksum(cmd, 5);
   
   const char *mode_str = (mode == 0x00) ? "Single Measurement" : "Continuous Measurement";
   ESP_LOGD(TAG, "Sending SET mode command to %s: 0x11 0x02 0x51 0x%02X 0x%02X", 
@@ -255,7 +255,7 @@ bool CM1106SLNSComponent::cm1106_set_working_status_(uint8_t mode) {
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, 4);
+  uint8_t expected_cs = cm1106_checksum(response, 4);
   if (response[3] != expected_cs) {
     ESP_LOGW(TAG, "SET working mode response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[3]);
@@ -280,7 +280,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   memset(version, 0, len);
   
   uint8_t cmd[4] = {0x11, 0x01, 0x1E, 0x00};  // Comando: 0x1E (GET_SOFTWARE_VERSION)
-  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  cmd[3] = cm1106_checksum(cmd, 4);
   
   ESP_LOGD(TAG, "Sending GET software version command: 0x11 0x01 0x1E 0x%02X", cmd[3]);
   
@@ -309,7 +309,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  uint8_t expected_cs = cm1106_checksum(response, sizeof(response));
   if (response[14] != expected_cs) {
     ESP_LOGW(TAG, "Software version response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[14]);
@@ -340,7 +340,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   memset(serial, 0, len);
   
   uint8_t cmd[4] = {0x11, 0x01, 0x1F, 0x00};  // Comando: 0x1F (GET_SERIAL_NUMBER)
-  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  cmd[3] = cm1106_checksum(cmd, 4);
   
   ESP_LOGD(TAG, "Sending GET serial number command: 0x11 0x01 0x1F 0x%02X", cmd[3]);
   
@@ -368,7 +368,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  uint8_t expected_cs = cm1106_checksum(response, sizeof(response));
   if (response[13] != expected_cs) {
     ESP_LOGW(TAG, "Serial number response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[13]);
@@ -398,7 +398,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   }
   
   uint8_t cmd[4] = {0x11, 0x01, 0x50, 0x00};  // Comando: 0x50 (MEASUREMENT_PERIOD GET)
-  cmd[3] = this->cm1106_checksum_(cmd, 4);
+  cmd[3] = cm1106_checksum(cmd, 4);
   
   ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
   
@@ -426,7 +426,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  uint8_t expected_cs = cm1106_checksum(response, sizeof(response));
   if (response[7] != expected_cs) {
     ESP_LOGW(TAG, "Measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[7]);
@@ -452,7 +452,7 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   uint8_t period_l = period & 0xFF;
   
   uint8_t cmd[7] = {0x11, 0x04, 0x50, period_h, period_l, smoothing, 0x00};
-  cmd[6] = this->cm1106_checksum_(cmd, 7);
+  cmd[6] = cm1106_checksum(cmd, 7);
   
   ESP_LOGD(TAG, "Sending SET measurement period command: 0x11 0x04 0x50 0x%02X 0x%02X 0x%02X 0x%02X", 
            period_h, period_l, smoothing, cmd[6]);
@@ -481,7 +481,7 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   }
   
   // Validate checksum
-  uint8_t expected_cs = this->cm1106_checksum_(response, sizeof(response));
+  uint8_t expected_cs = cm1106_checksum(response, sizeof(response));
   if (response[3] != expected_cs) {
     ESP_LOGW(TAG, "SET measurement period response checksum mismatch: expected 0x%02X, got 0x%02X",
              expected_cs, response[3]);
