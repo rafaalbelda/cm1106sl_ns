@@ -105,7 +105,7 @@ void CM1106SLNSComponent::update() {
   
   // Look for complete frame in buffer (8 bytes starting with 0x16)
   while (this->available() >= 8) {
-    uint8_t frame[8] = {0};
+    uint8_t response[8] = {0};
     
     // Find start byte (0x16)
     uint8_t start_byte = this->read();
@@ -115,27 +115,27 @@ void CM1106SLNSComponent::update() {
     }
     
     // Read remaining 7 bytes
-    frame[0] = start_byte;
-    if (!this->read_array(&frame[1], 7)) {
+    response[0] = start_byte;
+    if (!this->read_array(&response[1], 7)) {
       ESP_LOGW(TAG, "Failed to read complete frame from buffer");
       return;
     }
     
     // Validate checksum
-    uint8_t expected_checksum = cm1106_checksum_(frame, sizeof(frame));
-    if (frame[7] != expected_checksum) {
-      ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X, frame: [0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X]",
-               expected_checksum, frame[7], frame[0], frame[1], frame[2], frame[3], frame[4], frame[5], frame[6], frame[7]);
-      continue;  // Try next frame
+  uint8_t expected_checksum = cm1106_checksum_(response, sizeof(response));
+  if (response[7] != expected_checksum) {
+    ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", expected_checksum, response[7]);
+    this->status_set_warning();
+    return;
     }
     
     this->status_clear_warning();
     
     // Extract CO2 value - sensor sends continuous frame with CO2 at bytes 3-4
     // Continuous frame format: [0x16][CMD_ECHO][0x50][CO2H][CO2L][DF3][DF4][CS]
-    uint16_t co2 = (frame[3] << 8) | frame[4];
-    uint8_t status = frame[5];
-    uint8_t info = frame[6];
+    uint16_t co2 = (response[3] << 8) | response[4];
+    uint8_t status = response[5];
+    uint8_t info = response[6];
     
     ESP_LOGD(TAG, "CO2=%uppm, Status=0x%02X, Info=0x%02X", co2, status, info);
     
@@ -158,6 +158,28 @@ void CM1106SLNSComponent::update() {
   }
 }
 
+bool CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *buffer, size_t len, uint32_t timeout_ms) {
+  if (buffer == nullptr || len == 0) {
+    return false;
+  }
+
+  uint32_t deadline = millis() + timeout_ms;
+  size_t idx = 0;
+  while (idx < len) {
+    if (!this->available()) {
+      if (millis() >= deadline) {
+        return false;
+      }
+      delayMicroseconds(100);
+      continue;
+    }
+
+    buffer[idx++] = this->read();
+  }
+
+  return true;
+}
+
 bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len, 
                                                 uint8_t *response, size_t response_len) {
   // Clear RX buffer completely
@@ -167,7 +189,9 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   
   // Send command
   this->write_array(command, command_len - 1);
+  // Send checksum
   this->write_byte(cm1106_checksum_(command, command_len));
+  // Ensure all bytes are sent
   this->flush();
 
   if (response == nullptr)
@@ -177,8 +201,8 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   delay(20);
   
   // Synchronize: discard any junk bytes until we find 0x16 (response start marker)
-  uint32_t sync_timeout = millis() + 100;
-  while (millis() < sync_timeout) {
+  uint32_t sync_deadline = millis() + 100;
+  while (millis() < sync_deadline) {
     if (!this->available()) {
       delayMicroseconds(100);
       continue;
@@ -188,8 +212,12 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
     if (byte == 0x16) {
       // Found response start marker
       response[0] = byte;
-      // Read the rest of the response
-      return this->read_array(&response[1], response_len - 1);
+      uint32_t remaining_timeout = (sync_deadline > millis()) ? sync_deadline - millis() : 0;
+      if (remaining_timeout == 0) {
+        ESP_LOGW(TAG, "Timeout waiting for full response after sync marker");
+        return false;
+      }
+      return this->cm1106_serial_read_bytes(&response[1], response_len - 1, remaining_timeout);
     }
     // Discard junk bytes and keep looking for 0x16
   }
