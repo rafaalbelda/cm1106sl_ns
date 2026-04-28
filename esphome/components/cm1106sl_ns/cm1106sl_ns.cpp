@@ -89,7 +89,7 @@ void CM1106SLNSComponent::setupCM1106_() {
       this->initialized0_ = true;
     }
     
-    if (this->initialized1_ > 0) {
+    if (!this->initialized1_) {
       // Step 3: Read current measurement period and smoothing settings
       ESP_LOGCONFIG(TAG, "Step 3: Reading current measurement configuration...");
       uint16_t current_period = 0;
@@ -97,7 +97,6 @@ void CM1106SLNSComponent::setupCM1106_() {
       
       if (!this->cm1106_get_measurement_period_(&current_period, &current_smoothing)) {
         ESP_LOGW(TAG, "  Failed to read current measurement period");
-        this->initialized1_--;
         this->status_set_warning();
         return;
       } else {
@@ -123,11 +122,11 @@ void CM1106SLNSComponent::setupCM1106_() {
       } else {
         ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
       }
-      this->initialized1_ = 0;
+      this->initialized1_ = true;
     }
     
     ESP_LOGCONFIG(TAG, "Initialization complete - sensor ready for continuous data streaming");
-    this->initialized_ = this->initialized0_ && (this->initialized1_ == 0);
+    this->initialized_ = this->initialized0_ && this->initialized1_;
   }
 
 }
