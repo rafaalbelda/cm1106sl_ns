@@ -576,7 +576,7 @@ void CM1106SLNSComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "Sensor connection successful");
 
     // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
-    //this->setup();
+    this->setup();
   }
 }
 
