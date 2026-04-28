@@ -30,12 +30,15 @@ void CM1106SLNSComponent::setup() {
   }
 }
 
-void CM1106SLNSComponent::update() {
+
+bool CM1106SLNSComponent::setupCM1106_() {
   if (!this->initialized_) {
     // Initialization: First detect and set working mode to continuous, then configure period/smoothing
     // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
     
     ESP_LOGCONFIG(TAG, "-== CM1106SL-NS Initialization ==-");
+
+    uint8_t current_mode = 0xFF;
     
     
     if (!this->initializedStep0_) {
@@ -62,7 +65,7 @@ void CM1106SLNSComponent::update() {
     if (!this->initializedStep1_) {
       // Step 1: Detect current working mode and switch to continuous if needed
       ESP_LOGCONFIG(TAG, "Step 1: Detecting sensor working mode...");
-      uint8_t current_mode = 0xFF;
+      //uint8_t current_mode = 0xFF;
       if (!this->cm1106_get_working_status_(&current_mode)) {
         ESP_LOGE(TAG, "  Failed to detect sensor working mode");
         this->mark_failed();
@@ -136,6 +139,12 @@ void CM1106SLNSComponent::update() {
     this->initialized_ = this->initializedStep0_ && this->initializedStep1_ && this->initializedStep2_ && this->initializedStep3_ && this->initializedStep4_;
   }
 
+}
+
+void CM1106SLNSComponent::update() {
+
+  this->setupCM1106_();
+  
   uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
     ESP_LOGW(TAG, "Reading data from CM1106 failed!");

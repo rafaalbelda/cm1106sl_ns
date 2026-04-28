@@ -35,7 +35,8 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   bool initializedStep4_ = false;
 
 
- bool cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response, size_t response_len);
+  bool setupCM1106_();
+  bool cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response, size_t response_len);
   // bool cm1106_serial_read_bytes(uint8_t *buffer, size_t len, uint32_t timeout_ms);
   uint8_t cm1106_checksum_(const uint8_t *response, size_t len);
   bool cm1106_get_working_status_(uint8_t *mode);
