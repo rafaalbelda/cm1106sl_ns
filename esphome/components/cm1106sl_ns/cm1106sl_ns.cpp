@@ -102,6 +102,36 @@ void CM1106SLNSComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setup complete - sensor ready for continuous data streaming");
 }
 
+void CM1106SLNSComponent::update() {
+  uint8_t response[8] = {0};
+  if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Reading data from CM1106 failed!");
+    this->status_set_warning();
+    return;
+  }
+
+  if (response[0] != 0x16 || response[1] != 0x05 || response[2] != 0x01) {
+    ESP_LOGW(TAG, "Got wrong UART response from CM1106: %02X %02X %02X %02X", response[0], response[1], response[2],
+             response[3]);
+    this->status_set_warning();
+    return;
+  }
+
+  uint8_t checksum = cm1106_checksum(response, sizeof(response));
+  if (response[7] != checksum) {
+    ESP_LOGW(TAG, "CM1106 Checksum doesn't match: 0x%02X!=0x%02X", response[7], checksum);
+    this->status_set_warning();
+    return;
+  }
+
+  this->status_clear_warning();
+
+  uint16_t ppm = response[3] << 8 | response[4];
+  ESP_LOGD(TAG, "CM1106 Received CO₂=%uppm DF3=%02X DF4=%02X", ppm, response[5], response[6]);
+  if (this->co2_sensor_ != nullptr)
+    this->co2_sensor_->publish_state(ppm);
+}
+
 // bool CM1106SLNSComponent::cm1106_serial_read_bytes(uint8_t *buffer, size_t len, uint32_t timeout_ms) {
 //   if (buffer == nullptr || len == 0) {
 //     return false;
