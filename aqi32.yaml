@@ -69,6 +69,7 @@ sensor:
     uart_id: uart_cm
     update_interval: 60s
     config_period: 4s
+    response_timeout: 5s
     smoothing_samples: 1
     co2:
       name: "CO2 Level"
@@ -230,4 +231,3 @@ display:
       #       it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2).state);
 
 
-    

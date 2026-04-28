@@ -26,6 +26,14 @@ void CM1106SLNSComponent::setup() {
 //  this->setupCM1106_();
 }
 
+void CM1106SLNSComponent::set_response_timeout(uint32_t response_timeout_ms) {
+  this->response_timeout_ms_ = response_timeout_ms;
+  if (this->transaction_pending_()) {
+    this->pending_response_timeout_ms_ = response_timeout_ms;
+  }
+  ESP_LOGCONFIG(TAG, "  Response Timeout configured: %u ms", static_cast<unsigned>(this->response_timeout_ms_));
+}
+
 
 void CM1106SLNSComponent::setupCM1106_() {
   if (this->initialized_ || this->transaction_pending_() || this->init_state_ == InitState::FAILED) {
@@ -102,7 +110,8 @@ bool CM1106SLNSComponent::start_transaction_(TransactionOperation operation, con
   memset(this->response_buffer_, 0, sizeof(this->response_buffer_));
   this->pending_operation_ = operation;
   this->response_len_ = response_len;
-  this->response_deadline_ = millis() + this->response_timeout_ms_;
+  this->response_started_at_ = millis();
+  this->pending_response_timeout_ms_ = this->response_timeout_ms_;
 
   this->write_array(command, command_len - 1);
   this->write_byte(cm1106_checksum(command, command_len));
@@ -131,7 +140,7 @@ void CM1106SLNSComponent::poll_response_() {
     return;
   }
 
-  if (static_cast<int32_t>(millis() - this->response_deadline_) >= 0) {
+  if (millis() - this->response_started_at_ >= this->pending_response_timeout_ms_) {
     this->finish_transaction_(false);
     this->handle_transaction_timeout_(operation);
   }
@@ -141,13 +150,15 @@ void CM1106SLNSComponent::finish_transaction_(bool success) {
   this->cancel_interval("cm1106_read_response");
   this->pending_operation_ = TransactionOperation::NONE;
   this->response_len_ = 0;
+  this->response_started_at_ = 0;
   if (!success) {
     memset(this->response_buffer_, 0, sizeof(this->response_buffer_));
   }
 }
 
 void CM1106SLNSComponent::handle_transaction_timeout_(TransactionOperation operation) {
-  ESP_LOGW(TAG, "Timeout waiting for CM1106 response after %u ms", static_cast<unsigned>(this->response_timeout_ms_));
+  ESP_LOGW(TAG, "Timeout waiting for CM1106 response after %u ms",
+           static_cast<unsigned>(this->pending_response_timeout_ms_));
   this->status_set_warning();
 
   switch (operation) {

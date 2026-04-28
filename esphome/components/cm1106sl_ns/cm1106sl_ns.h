@@ -21,7 +21,8 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
 
   void set_co2_sensor(sensor::Sensor *co2_sensor) { this->co2_sensor_ = co2_sensor; }
   void set_config_period(uint16_t period_s) { this->config_period_s_ = period_s; }
-  void set_response_timeout(uint32_t response_timeout_ms) { this->response_timeout_ms_ = response_timeout_ms; }
+  //void set_response_timeout(uint32_t response_timeout_ms) { this->response_timeout_ms_ = response_timeout_ms; }
+  void set_response_timeout(uint32_t response_timeout_ms);
   void set_smoothing_samples(uint8_t samples) { this->smoothing_samples_ = samples; }
 
  protected:
@@ -63,7 +64,8 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   TransactionOperation pending_operation_{TransactionOperation::NONE};
   uint8_t response_buffer_[15]{};
   size_t response_len_{0};
-  uint32_t response_deadline_{0};
+  uint32_t response_started_at_{0};
+  uint32_t pending_response_timeout_ms_{0};
 
   void setupCM1106_();
   bool start_transaction_(TransactionOperation operation, const uint8_t *command, size_t command_len,
