@@ -27,6 +27,7 @@ CM1106CalibrateZeroAction = cm1106sl_ns_ns.class_(
 )
 
 CONF_CONFIG_PERIOD = "config_period"
+CONF_RESPONSE_TIMEOUT = "response_timeout"
 CONF_SMOOTHING_SAMPLES = "smoothing_samples"
 
 CONFIG_SCHEMA = (
@@ -46,6 +47,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_SMOOTHING_SAMPLES, default=1): cv.All(
                 cv.positive_int, cv.Range(min=1, max=255)
             ),
+            cv.Optional(CONF_RESPONSE_TIMEOUT, default="4s"): cv.positive_time_period_milliseconds,
         },
     )
     .extend(cv.polling_component_schema("60s"))
@@ -65,6 +67,7 @@ async def to_code(config) -> None:
     # Sensor configuration for continuous mode
     cg.add(var.set_config_period(config[CONF_CONFIG_PERIOD]))
     cg.add(var.set_smoothing_samples(config[CONF_SMOOTHING_SAMPLES]))
+    cg.add(var.set_response_timeout(config[CONF_RESPONSE_TIMEOUT].total_milliseconds))
 
 
 CALIBRATION_ACTION_SCHEMA = maybe_simple_id(
