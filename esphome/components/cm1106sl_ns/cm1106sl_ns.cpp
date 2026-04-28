@@ -201,7 +201,7 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
   delay(20);
   
   // Synchronize: discard any junk bytes until we find 0x16 (response start marker)
-  uint32_t sync_deadline = millis() + 100;
+  uint32_t sync_deadline = millis() + 4000;  // Wait up to 4 seconds for response to start
   while (millis() < sync_deadline) {
     if (!this->available()) {
       delayMicroseconds(100);
