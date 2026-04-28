@@ -494,7 +494,7 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   return true;
 }
 
-void CM1106Component::calibrate_zero(uint16_t ppm) {
+void CM1106SLNSComponent::calibrate_zero(uint16_t ppm) {
   uint8_t cmd[6];
   memcpy(cmd, C_M1106_CMD_SET_CO2_CALIB, sizeof(cmd));
   cmd[3] = ppm >> 8;
@@ -519,7 +519,7 @@ void CM1106Component::calibrate_zero(uint16_t ppm) {
   ESP_LOGD(TAG, "CM1106 Successfully calibrated sensor to %uppm", ppm);
 }
 
-bool CM1106Component::cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response,
+bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response,
                                             size_t response_len) {
   // Empty RX Buffer
   while (this->available())
