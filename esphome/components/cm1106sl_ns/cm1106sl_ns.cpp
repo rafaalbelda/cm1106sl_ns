@@ -1,19 +1,23 @@
 #include "cm1106sl_ns.h"
 #include "esphome/core/log.h"
 
+#include <cinttypes>
+
 namespace esphome {
 namespace cm1106sl_ns {
 
 static const char *const TAG = "cm1106sl_ns";
 //static const uint32_t CM1106_SERIAL_READ_TIMEOUT_MS = 4000;
+static const uint8_t C_M1106_CMD_GET_CO2[4] = {0x11, 0x01, 0x01, 0xED};
+static const uint8_t C_M1106_CMD_SET_CO2_CALIB[6] = {0x11, 0x03, 0x03, 0x00, 0x00, 0x00};
+static const uint8_t C_M1106_CMD_SET_CO2_CALIB_RESPONSE[4] = {0x16, 0x01, 0x03, 0xE6};
 
-uint8_t CM1106SLNSComponent::cm1106_checksum_(const uint8_t *response, size_t len) {
-  // Two's complement checksum: sum all bytes except checksum, then (~sum) + 1
-  uint8_t sum = 0;
+uint8_t cm1106_checksum(const uint8_t *response, size_t len) {
+  uint8_t crc = 0;
   for (size_t i = 0; i < len - 1; i++) {
-    sum += response[i];
+    crc -= response[i];
   }
-  return (~sum) + 1;
+  return crc;
 }
 
 void CM1106SLNSComponent::setup() {
@@ -490,21 +494,60 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   return true;
 }
 
+void CM1106Component::calibrate_zero(uint16_t ppm) {
+  uint8_t cmd[6];
+  memcpy(cmd, C_M1106_CMD_SET_CO2_CALIB, sizeof(cmd));
+  cmd[3] = ppm >> 8;
+  cmd[4] = ppm & 0xFF;
+  uint8_t response[4] = {0};
+
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Reading data from CM1106 failed!");
+    this->status_set_warning();
+    return;
+  }
+
+  // check if correct response received
+  if (memcmp(response, C_M1106_CMD_SET_CO2_CALIB_RESPONSE, sizeof(response)) != 0) {
+    ESP_LOGW(TAG, "Got wrong UART response from CM1106: %02X %02X %02X %02X", response[0], response[1], response[2],
+             response[3]);
+    this->status_set_warning();
+    return;
+  }
+
+  this->status_clear_warning();
+  ESP_LOGD(TAG, "CM1106 Successfully calibrated sensor to %uppm", ppm);
+}
+
+bool CM1106Component::cm1106_write_command_(const uint8_t *command, size_t command_len, uint8_t *response,
+                                            size_t response_len) {
+  // Empty RX Buffer
+  while (this->available())
+    this->read();
+  this->write_array(command, command_len - 1);
+  this->write_byte(cm1106_checksum(command, command_len));
+  this->flush();
+
+  if (response == nullptr)
+    return true;
+
+  return this->read_array(response, response_len);
+}
+
 void CM1106SLNSComponent::dump_config() {
-  ESP_LOGCONFIG(TAG, "CM1106SL-NS (Continuous Mode):");
+  ESP_LOGCONFIG(TAG, "CM1106SL-NS:");
   LOG_SENSOR("  ", "CO2", this->co2_sensor_);
   ESP_LOGCONFIG(TAG, "  Config Period: %u seconds", this->config_period_s_);
   ESP_LOGCONFIG(TAG, "  Smoothing Samples: %u", this->smoothing_samples_);
   this->check_uart_settings(9600);
   if (this->is_failed()) {
-    ESP_LOGE(TAG, "Failed connecting to sensor");
+    ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
   } else {
     ESP_LOGCONFIG(TAG, "Sensor connection successful");
 
     // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
     //this->setup();
   }
-
 }
 
 }  // namespace cm1106sl_ns
