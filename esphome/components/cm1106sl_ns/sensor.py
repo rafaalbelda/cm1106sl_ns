@@ -21,7 +21,7 @@ cm1106sl_ns_ns = cg.esphome_ns.namespace("cm1106sl_ns")
 CM1106SLNSComponent = cm1106sl_ns_ns.class_(
     "CM1106SLNSComponent", cg.PollingComponent, uart.UARTDevice
 )
-CM1106CalibrateZeroAction = cm1106_ns.class_(
+CM1106CalibrateZeroAction = cm1106sl_ns_ns.class_(
     "CM1106CalibrateZeroAction",
     automation.Action,
 )
@@ -69,7 +69,7 @@ async def to_code(config) -> None:
 
 CALIBRATION_ACTION_SCHEMA = maybe_simple_id(
     {
-        cv.GenerateID(): cv.use_id(CM1106Component),
+        cv.GenerateID(): cv.use_id(CM1106SLNSComponent),
     },
 )
 
