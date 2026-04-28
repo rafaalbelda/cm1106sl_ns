@@ -132,7 +132,7 @@ void CM1106SLNSComponent::setup() {
 
 //   ESP_LOGW(TAG, "Timeout waiting for response marker (0x16)");
 //   return false;
-}
+//}
 
 // bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t command_len) {
 //   if (command == nullptr || command_len == 0) {
