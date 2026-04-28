@@ -30,7 +30,7 @@ void CM1106SLNSComponent::setup() {
   }
 }
 
-void CM1106SLNSComponent::update() {
+void CM1106SLNSComponent::setup1106_() {
   if (!this->initialized_) {
     // Initialization: First detect and set working mode to continuous, then configure period/smoothing
     // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
@@ -113,6 +113,11 @@ void CM1106SLNSComponent::update() {
     ESP_LOGCONFIG(TAG, "Initialization complete - sensor ready for continuous data streaming");
     this->initialized_ = true;
   }
+}
+
+void CM1106SLNSComponent::update() {
+
+  //setup1106_();  // Ensure sensor is initialized and configured before reading data
 
   uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
@@ -587,7 +592,7 @@ void CM1106SLNSComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "Sensor connection successful");
 
     // setup is not executed so we include the call here to ensure the sensor is properly initialized and configured before use
-    //this->setup();
+    this->setup1106_();
   }
 }
 
