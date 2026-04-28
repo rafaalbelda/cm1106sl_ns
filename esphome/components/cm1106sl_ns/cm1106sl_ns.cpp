@@ -443,7 +443,7 @@ bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8
   
   ESP_LOGD(TAG, "Sending GET measurement period command: 0x11 0x01 0x50 0x%02X", cmd[3]);
   
-  uint8_t response[8] = {0};
+  uint8_t response[7] = {0};
     if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
     ESP_LOGW(TAG, "Failed to read measurement period!");
     this->status_set_warning();
