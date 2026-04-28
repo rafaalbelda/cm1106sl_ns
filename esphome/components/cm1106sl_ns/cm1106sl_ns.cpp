@@ -284,7 +284,7 @@ bool CM1106SLNSComponent::cm1106_get_software_version_(char *version, size_t len
   if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
     ESP_LOGW(TAG, "Failed to read software version!");
     this->status_set_warning();
-    return;
+    return false ;
   }
   // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
   //   ESP_LOGE(TAG, "Failed to send GET software version command");
@@ -344,7 +344,7 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
     if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
     ESP_LOGW(TAG, "Failed to read serial number!");
     this->status_set_warning();
-    return;
+    return false;
   }
   // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
   //   ESP_LOGE(TAG, "Failed to send GET serial number command");
@@ -457,7 +457,7 @@ bool CM1106SLNSComponent::cm1106_set_measurement_period_(uint16_t period, uint8_
   if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
     ESP_LOGW(TAG, "Failed to SET measurement period!");
     this->status_set_warning();
-    return;
+    return false;
   }
   // if (!this->cm1106_write_command_(cmd, sizeof(cmd))) {
   //   ESP_LOGE(TAG, "Failed to send SET measurement period command");
