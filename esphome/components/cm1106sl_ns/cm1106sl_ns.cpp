@@ -23,7 +23,7 @@ uint8_t cm1106_checksum(const uint8_t *response, size_t len) {
 }
 
 void CM1106SLNSComponent::setup() {
-  this->setupCM1106_();
+//  this->setupCM1106_();
 }
 
 
@@ -69,6 +69,11 @@ void CM1106SLNSComponent::setupCM1106_() {
 }
 
 void CM1106SLNSComponent::update() {
+
+  if (!(this->initialized_ || this->transaction_pending_() || this->init_state_ == InitState::FAILED)) {
+    this->setupCM1106_();
+  }
+
   if (this->transaction_pending_()) {
     return;
   }
@@ -221,23 +226,23 @@ void CM1106SLNSComponent::process_response_(TransactionOperation operation) {
         this->init_state_ = InitState::GET_MEASUREMENT_PERIOD;
         this->setupCM1106_();
       } else {
-        ESP_LOGE(TAG, "Failed to set continuous mode");
+        ESP_LOGE(TAG, "  Failed to set continuous mode");
         this->fail_initialization_();
       }
       break;
     case TransactionOperation::INIT_GET_MEASUREMENT_PERIOD:
       success = this->process_measurement_period_response_();
       if (success) {
+        ESP_LOGCONFIG(TAG, "Step 4: Checking if configuration update is needed...");
         ESP_LOGCONFIG(TAG, "  Current settings: period=%u seconds, smoothing=%u samples", this->current_period_,
                       this->current_smoothing_);
-        ESP_LOGCONFIG(TAG, "Step 4: Checking if configuration update is needed...");
         if (this->current_period_ != this->config_period_s_ || this->current_smoothing_ != this->smoothing_samples_) {
           ESP_LOGCONFIG(TAG, "  Configuration differs - updating sensor settings...");
           ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", this->config_period_s_,
                         this->smoothing_samples_);
           this->init_state_ = InitState::SET_MEASUREMENT_PERIOD;
         } else {
-          ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
+          ESP_LOGCONFIG(TAG, "  Measurement Period matches - no changes needed");
           this->init_state_ = InitState::DONE;
         }
         this->setupCM1106_();
@@ -249,11 +254,11 @@ void CM1106SLNSComponent::process_response_(TransactionOperation operation) {
     case TransactionOperation::INIT_SET_MEASUREMENT_PERIOD:
       success = this->process_set_measurement_period_response_();
       if (success) {
-        ESP_LOGCONFIG(TAG, "Configuration updated successfully");
+        ESP_LOGCONFIG(TAG, "  Measurement Period updated successfully");
         this->init_state_ = InitState::DONE;
         this->setupCM1106_();
       } else {
-        ESP_LOGE(TAG, "Failed to update measurement period");
+        ESP_LOGE(TAG, "  Failed to update measurement period");
         this->fail_initialization_();
       }
       break;

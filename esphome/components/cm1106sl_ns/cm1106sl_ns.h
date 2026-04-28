@@ -53,7 +53,7 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint32_t response_timeout_ms_{4000};
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool initialized_ = false;
-  bool init_logged_ = false;
+  bool init_logged_ = false; 
   InitState init_state_{InitState::READ_SOFTWARE_VERSION};
   uint8_t current_mode_{0xFF};
   uint16_t current_period_{0};
