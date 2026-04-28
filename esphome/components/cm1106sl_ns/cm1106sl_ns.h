@@ -28,11 +28,8 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   uint16_t config_period_s_ = 4;         // config period in seconds (1-65535s)
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool initialized_ = false;
-  bool initializedStep0_ = false;
-  bool initializedStep1_ = false;
-  bool initializedStep2_ = false;
-  bool initializedStep3_ = false;
-  bool initializedStep4_ = false;
+  bool initialized0_ = false;
+  uint8_t initialized1_ = 3;
 
 
   void setupCM1106_();
