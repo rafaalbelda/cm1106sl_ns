@@ -4,7 +4,7 @@
 #include "esphome/core/automation.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
-#include "../cm1106/cm1106.h"
+#include "esphome/components/cm1106/cm1106.h"
 
 namespace esphome {
 namespace cm1106sl_ns {
