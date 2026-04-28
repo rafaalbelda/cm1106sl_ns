@@ -31,7 +31,7 @@ void CM1106SLNSComponent::setup() {
 }
 
 
-bool CM1106SLNSComponent::setupCM1106_() {
+void CM1106SLNSComponent::setupCM1106_() {
   if (!this->initialized_) {
     // Initialization: First detect and set working mode to continuous, then configure period/smoothing
     // Reference: Arduino my_cm1106.ino setupCM1106() / UART_COMMUNICATION.md
@@ -111,28 +111,28 @@ bool CM1106SLNSComponent::setupCM1106_() {
                       current_period, current_smoothing);
       }
       this->initializedStep3_ = true;
-    }
     
-    if (!this->initializedStep4_) {
-      // Step 4: Update measurement period and smoothing if different from desired configuration
-      ESP_LOGCONFIG(TAG, "Step 4: Checking if configuration update is needed...");
-      // Step 4: Update period and smoothing only if different from current values
-      if (current_period != this->config_period_s_ || current_smoothing != this->smoothing_samples_) {
-        ESP_LOGCONFIG(TAG, "  Configuration differs - updating sensor settings...");
-        ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", 
-                      this->config_period_s_, this->smoothing_samples_);
-        
-        if (!this->cm1106_set_measurement_period_(this->config_period_s_, this->smoothing_samples_)) {
-          ESP_LOGE(TAG, "Failed to update measurement period");
-          this->mark_failed();
-          this->initialized_ = true;
-          return;
+      if (!this->initializedStep4_) {
+        // Step 4: Update measurement period and smoothing if different from desired configuration
+        ESP_LOGCONFIG(TAG, "Step 4: Checking if configuration update is needed...");
+        // Step 4: Update period and smoothing only if different from current values
+        if (current_period != this->config_period_s_ || current_smoothing != this->smoothing_samples_) {
+          ESP_LOGCONFIG(TAG, "  Configuration differs - updating sensor settings...");
+          ESP_LOGCONFIG(TAG, "  Target: period=%u seconds, smoothing=%u samples", 
+                        this->config_period_s_, this->smoothing_samples_);
+          
+          if (!this->cm1106_set_measurement_period_(this->config_period_s_, this->smoothing_samples_)) {
+            ESP_LOGE(TAG, "Failed to update measurement period");
+            this->mark_failed();
+            this->initialized_ = true;
+            return;
+          }
+          ESP_LOGCONFIG(TAG, "Configuration updated successfully");
+        } else {
+          ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
         }
-        ESP_LOGCONFIG(TAG, "Configuration updated successfully");
-      } else {
-        ESP_LOGCONFIG(TAG, "Step 4: Configuration matches - no changes needed");
+        this->initializedStep4_ = true;
       }
-      this->initializedStep4_ = true;
     }
     
     ESP_LOGCONFIG(TAG, "Initialization complete - sensor ready for continuous data streaming");
@@ -144,7 +144,7 @@ bool CM1106SLNSComponent::setupCM1106_() {
 void CM1106SLNSComponent::update() {
 
   this->setupCM1106_();
-  
+
   uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
     ESP_LOGW(TAG, "Reading data from CM1106 failed!");
