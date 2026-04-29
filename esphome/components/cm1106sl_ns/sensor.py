@@ -28,6 +28,7 @@ CONF_IAQ_NUMERIC = "iaq_numeric"
 CONF_STATUS = "status"
 CONF_DEBUG = "debug"
 CONF_MEASUREMENT_PERIOD = "measurement_period"
+CONF_PROTOCOL = "protocol"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -74,9 +75,16 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             cv.Optional(CONF_MEASUREMENT_PERIOD, default="60s"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_PROTOCOL, default="register"): cv.enum(
+                {
+                    "register": False,
+                    "command": True,
+                },
+                lower=True,
+            ),
         },
     )
-    .extend(i2c.i2c_device_schema(0x31))
+    .extend(i2c.i2c_device_schema(0x34))
 )
 
 
@@ -115,3 +123,6 @@ async def to_code(config) -> None:
 
     # Read interval for the command I2C protocol
     cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
+
+    # Protocol selection: register for CM1106SL-NS datasheet, command for cm1106_i2s library.
+    cg.add(var.set_command_protocol(config[CONF_PROTOCOL]))
