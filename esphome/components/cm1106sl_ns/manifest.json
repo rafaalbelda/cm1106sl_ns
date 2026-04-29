@@ -1,7 +1,7 @@
 {
   "domain": "cm1106sl_ns",
   "name": "CM1106SL-NS CO2 Sensor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "documentation": "https://github.com/rafaalbelda/cm1106sl_ns",
   "requirements": [],
   "dependencies": ["i2c"],

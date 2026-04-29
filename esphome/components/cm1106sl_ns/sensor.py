@@ -24,6 +24,7 @@ CONF_STABILITY = "stability"
 CONF_READY = "ready"
 CONF_ERROR = "error"
 CONF_IAQ_NUMERIC = "iaq_numeric"
+CONF_STATUS = "status"
 CONF_DEBUG = "debug"
 CONF_MEASUREMENT_PERIOD = "measurement_period"
 
@@ -62,11 +63,19 @@ CONFIG_SCHEMA = (
                     cv.GenerateID(): cv.declare_id(sensor.Sensor),
                 }
             ),
+            cv.Optional(CONF_STATUS): sensor.sensor_schema(
+                accuracy_decimals=0,
+                state_class=STATE_CLASS_MEASUREMENT,
+            ).extend(
+                {
+                    cv.GenerateID(): cv.declare_id(sensor.Sensor),
+                }
+            ),
             cv.Optional(CONF_DEBUG, default=False): cv.boolean,
             cv.Optional(CONF_MEASUREMENT_PERIOD, default="60s"): cv.positive_time_period_milliseconds,
         },
     )
-    .extend(i2c.i2c_device_schema(0x34))
+    .extend(i2c.i2c_device_schema(0x31))
 )
 
 
@@ -96,8 +105,12 @@ async def to_code(config) -> None:
         sens = await sensor.new_sensor(iaq_numeric_config)
         cg.add(var.set_iaq_numeric_sensor(sens))
 
+    if status_config := config.get(CONF_STATUS):
+        sens = await sensor.new_sensor(status_config)
+        cg.add(var.set_status_sensor(sens))
+
     # Debug flag for I2C logging
     cg.add(var.set_debug(config[CONF_DEBUG]))
 
-    # Read interval for I2C single measurement mode
+    # Read interval for the command I2C protocol
     cg.add(var.set_measurement_period(config[CONF_MEASUREMENT_PERIOD]))
