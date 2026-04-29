@@ -1,1 +1,1 @@
-"""CM1106SL-NS component for ESPHome."""
+"""CM1106SL-NS I2C component for ESPHome."""
