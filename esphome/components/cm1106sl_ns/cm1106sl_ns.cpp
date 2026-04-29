@@ -241,14 +241,17 @@ void CM1106SLNSComponent::loop() {
 void CM1106SLNSComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS (%s I2C Protocol):", this->command_protocol_ ? "Command" : "Register");
   LOG_SENSOR(" ", "CO2", this->co2_sensor_);
-  LOG_SENSOR(" ", "Stability", this->stability_sensor_);
-  LOG_BINARY_SENSOR(" ", "Ready", this->ready_sensor_);
-  LOG_BINARY_SENSOR(" ", "Error", this->error_sensor_);
-  LOG_SENSOR(" ", "IAQ Index", this->iaq_numeric_);
-  LOG_SENSOR(" ", "Status", this->status_sensor_);
+  ESP_LOGCONFIG(TAG, "Stability", this->stability_sensor_);
+  ESP_LOGCONFIG(TAG, "Ready", this->ready_sensor_);
+  ESP_LOGCONFIG(TAG, "Error", this->error_sensor_);
+  ESP_LOGCONFIG(TAG, "IAQ Index", this->iaq_numeric_);
+  ESP_LOGCONFIG(TAG, "Status", this->status_sensor_);
   ESP_LOGCONFIG(TAG, "Debug: %s", this->debug_ ? "enabled" : "disabled");
   ESP_LOGCONFIG(TAG, "Read period: %us", this->measurement_period_ / 1000);
   ESP_LOGCONFIG(TAG, "Read delay: %ums", this->command_protocol_ ? CM1106_DELAY_FOR_ACK_MS : SINGLE_MEASUREMENT_DELAY_MS);
+
+
+  this->setup();
 }
 
 }  // namespace cm1106sl_ns
