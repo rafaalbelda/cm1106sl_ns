@@ -2,6 +2,8 @@
 
 CM1106SL-NS CO2 sensor component for ESPHome using the I2C register protocol from the datasheet.
 
+-------------DOES NOT WORK-----------
+
 Default I2C address: `0x34`.
 
 ```yaml
