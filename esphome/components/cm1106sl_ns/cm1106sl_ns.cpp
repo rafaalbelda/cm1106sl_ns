@@ -248,8 +248,10 @@ void CM1106SLNSComponent::dump_config() {
   LOG_SENSOR(" ", "Status", this->status_sensor_);
   ESP_LOGCONFIG(TAG, "Debug: %s", this->debug_ ? "enabled" : "disabled");
   ESP_LOGCONFIG(TAG, "Read period: %us", this->measurement_period_ / 1000);
+  ESP_LOGCONFIG(TAG, "Protocol: %s", this->command_protocol_ ? "command" : "register");
   ESP_LOGCONFIG(TAG, "Read delay: %ums", this->command_protocol_ ? CM1106_DELAY_FOR_ACK_MS : SINGLE_MEASUREMENT_DELAY_MS);
 
+  
   this->setup();
 }
 
