@@ -31,3 +31,5 @@ bak/cm1106sl_ns/cm1106sl_ns.cpp
 bak/cm1106sl_ns/cm1106sl_ns.h
 bak/cm1106sl_ns/manifest.json
 bak/cm1106sl_ns/sensor.py
+cm1106_i2s/cm1106_i2c.cpp
+cm1106_i2s/cm1106_i2c.h
