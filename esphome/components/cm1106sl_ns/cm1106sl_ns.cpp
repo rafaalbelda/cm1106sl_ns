@@ -22,6 +22,7 @@ void CM1106SLNSComponent::setup() {
 
   if (!this->configure_measurement_mode_()) {
     this->set_error_(true);
+    this->mark_failed();
     return;
   }
 
@@ -67,7 +68,7 @@ void CM1106SLNSComponent::set_error_(bool error) {
 
 bool CM1106SLNSComponent::configure_measurement_mode_() {
   const uint8_t mode = this->single_mode_ ? 0x01 : 0x00;
-  if (!this->write_byte(REG_MEASUREMENT_MODE, mode)) {
+  if (!this->write_register_bytes_(REG_MEASUREMENT_MODE, &mode, 1)) {
     ESP_LOGW(TAG, "Failed to set %s measurement mode", this->single_mode_ ? "single" : "continuous");
     return false;
   }
@@ -88,7 +89,8 @@ bool CM1106SLNSComponent::configure_measurement_mode_() {
 }
 
 bool CM1106SLNSComponent::start_single_measurement_() {
-  if (!this->write_byte(REG_START_SINGLE_MEASUREMENT, 0x01)) {
+  const uint8_t command = 0x01;
+  if (!this->write_register_bytes_(REG_START_SINGLE_MEASUREMENT, &command, 1)) {
     this->error_count_++;
     ESP_LOGW(TAG, "Failed to start single measurement (count: %u)", this->error_count_);
     this->set_error_(true);
