@@ -70,6 +70,9 @@ sensor:
     update_interval: 60s
     config_period: 4s
     smoothing_samples: 1
+    abc_active: false
+    abc_cycle_days: 7
+    abc_baseline: 400
     co2:
       name: "CO2 Level"
 
