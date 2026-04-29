@@ -28,7 +28,7 @@ CM1106CalibrateZeroAction = cm1106sl_ns_ns.class_(
 
 CONF_CONFIG_PERIOD = "config_period"
 CONF_SMOOTHING_SAMPLES = "smoothing_samples"
-CONF_ABC_STATUS = "abc_status"
+CONF_ABC_ACTIVE = "abc_active"
 CONF_ABC_CYCLE_DAYS = "abc_cycle_days"
 CONF_ABC_BASELINE = "abc_baseline"
 
@@ -43,28 +43,18 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_CARBON_DIOXIDE,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
-            cv.Optional(CONF_ABC_STATUS): sensor.sensor_schema(
-                icon="mdi:state-machine",
-                accuracy_decimals=0,
-            ),
-            cv.Optional(CONF_ABC_CYCLE_DAYS): sensor.sensor_schema(
-                unit_of_measurement="d",
-                icon="mdi:calendar-refresh",
-                accuracy_decimals=0,
-                state_class=STATE_CLASS_MEASUREMENT,
-            ),
-            cv.Optional(CONF_ABC_BASELINE): sensor.sensor_schema(
-                unit_of_measurement=UNIT_PARTS_PER_MILLION,
-                icon=ICON_MOLECULE_CO2,
-                accuracy_decimals=0,
-                device_class=DEVICE_CLASS_CARBON_DIOXIDE,
-                state_class=STATE_CLASS_MEASUREMENT,
-            ),
             cv.Optional(CONF_CONFIG_PERIOD, default=4): cv.All(
                 cv.positive_int, cv.Range(min=1, max=65535)
             ),
             cv.Optional(CONF_SMOOTHING_SAMPLES, default=1): cv.All(
                 cv.positive_int, cv.Range(min=1, max=255)
+            ),
+            cv.Optional(CONF_ABC_ACTIVE): cv.boolean,
+            cv.Optional(CONF_ABC_CYCLE_DAYS): cv.All(
+                cv.positive_int, cv.Range(min=1, max=10)
+            ),
+            cv.Optional(CONF_ABC_BASELINE): cv.All(
+                cv.positive_int, cv.Range(min=400, max=1500)
             ),
         },
     )
@@ -81,19 +71,16 @@ async def to_code(config) -> None:
     if co2_config := config.get(CONF_CO2):
         sens = await sensor.new_sensor(co2_config)
         cg.add(var.set_co2_sensor(sens))
-    if abc_status_config := config.get(CONF_ABC_STATUS):
-        sens = await sensor.new_sensor(abc_status_config)
-        cg.add(var.set_abc_status_sensor(sens))
-    if abc_cycle_days_config := config.get(CONF_ABC_CYCLE_DAYS):
-        sens = await sensor.new_sensor(abc_cycle_days_config)
-        cg.add(var.set_abc_cycle_days_sensor(sens))
-    if abc_baseline_config := config.get(CONF_ABC_BASELINE):
-        sens = await sensor.new_sensor(abc_baseline_config)
-        cg.add(var.set_abc_baseline_sensor(sens))
 
     # Sensor configuration for continuous mode
     cg.add(var.set_config_period(config[CONF_CONFIG_PERIOD]))
     cg.add(var.set_smoothing_samples(config[CONF_SMOOTHING_SAMPLES]))
+    if CONF_ABC_ACTIVE in config:
+        cg.add(var.set_abc_active(config[CONF_ABC_ACTIVE]))
+    if CONF_ABC_CYCLE_DAYS in config:
+        cg.add(var.set_abc_cycle_days(config[CONF_ABC_CYCLE_DAYS]))
+    if CONF_ABC_BASELINE in config:
+        cg.add(var.set_abc_baseline(config[CONF_ABC_BASELINE]))
 
 
 CALIBRATION_ACTION_SCHEMA = maybe_simple_id(
