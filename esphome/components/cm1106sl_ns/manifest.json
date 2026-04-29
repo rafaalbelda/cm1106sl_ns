@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "documentation": "https://github.com/rafaalbelda/cm1106sl_ns",
   "requirements": [],
-  "dependencies": ["i2c", "binary_sensor"],
+  "dependencies": ["i2c"],
   "codeowners": ["@rafaalbelda"]
 }
 

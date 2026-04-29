@@ -12,7 +12,8 @@ from esphome.const import (
     UNIT_PARTS_PER_MILLION,
 )
 
-DEPENDENCIES = ["i2c", "binary_sensor"]
+DEPENDENCIES = ["i2c"]
+AUTO_LOAD = ["binary_sensor"]
 CODEOWNERS = ["@rafaalbelda"]
 
 cm1106sl_ns_ns = cg.esphome_ns.namespace("cm1106sl_ns")
