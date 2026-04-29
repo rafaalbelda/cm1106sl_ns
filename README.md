@@ -1,8 +1,6 @@
 # cm1106sl_ns
 
-CM1106SL-NS CO2 sensor component for ESPHome.
-
-Default protocol: `register`, using the CM1106SL-NS datasheet registers.
+CM1106SL-NS CO2 sensor component for ESPHome using the I2C register protocol from the datasheet.
 
 Default I2C address: `0x34`.
 
@@ -15,7 +13,7 @@ i2c:
 sensor:
   - platform: cm1106sl_ns
     measurement_period: 60s
-    protocol: register
+    measurement_mode: single
     debug: false
 
     co2:
@@ -36,21 +34,16 @@ sensor:
 
 Optional outputs under `platform: cm1106sl_ns`: `co2`, `stability`, `status`, `iaq_numeric`, `ready`, and `error`.
 
-The `cm1106_i2s/cm1106_i2c` command protocol can also be selected explicitly:
+Continuous mode can be selected explicitly. `continuous_measurement_period` is written to sensor registers `0x96/0x97`; `measurement_period` is how often ESPHome reads the latest value.
 
 ```yaml
 sensor:
   - platform: cm1106sl_ns
-    protocol: command
-    address: 0x31
+    measurement_mode: continuous
+    continuous_measurement_period: 120s
+    measurement_period: 120s
     co2:
       name: "CO2"
 ```
 
-Status values follow the reference library:
-
-- `0`: preheating
-- `1`: normal operation
-- `2`: operating trouble
-- `3`: out of full scale
-- `5`: non-calibrated
+The optional `status` sensor exposes the raw error status register `0x01`.
