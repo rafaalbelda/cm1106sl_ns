@@ -20,11 +20,17 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   void calibrate_zero(uint16_t ppm);
 
   void set_co2_sensor(sensor::Sensor *co2_sensor) { this->co2_sensor_ = co2_sensor; }
+  void set_abc_status_sensor(sensor::Sensor *abc_status_sensor) { this->abc_status_sensor_ = abc_status_sensor; }
+  void set_abc_cycle_days_sensor(sensor::Sensor *abc_cycle_days_sensor) { this->abc_cycle_days_sensor_ = abc_cycle_days_sensor; }
+  void set_abc_baseline_sensor(sensor::Sensor *abc_baseline_sensor) { this->abc_baseline_sensor_ = abc_baseline_sensor; }
   void set_config_period(uint16_t period_s) { this->config_period_s_ = period_s; }
   void set_smoothing_samples(uint8_t samples) { this->smoothing_samples_ = samples; }
 
  protected:
   sensor::Sensor *co2_sensor_{nullptr};
+  sensor::Sensor *abc_status_sensor_{nullptr};
+  sensor::Sensor *abc_cycle_days_sensor_{nullptr};
+  sensor::Sensor *abc_baseline_sensor_{nullptr};
   uint16_t config_period_s_ = 4;         // config period in seconds (1-65535s)
   uint8_t smoothing_samples_ = 1;        // number of smoothed data points
   bool initialized_ = false;
@@ -36,6 +42,7 @@ class CM1106SLNSComponent : public PollingComponent, public uart::UARTDevice {
   bool cm1106_set_working_status_(uint8_t mode);
   bool cm1106_get_software_version_(char *version, size_t len);
   bool cm1106_get_serial_number_(char *serial, size_t len);
+  bool cm1106_get_abc_parameters_(uint8_t *status, uint8_t *cycle_days, uint16_t *baseline);
   bool cm1106_get_measurement_period_(uint16_t *period, uint8_t *smoothing);
   bool cm1106_set_measurement_period_(uint16_t period, uint8_t smoothing);
   void setup1106_();

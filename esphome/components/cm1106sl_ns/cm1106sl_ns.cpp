@@ -21,13 +21,13 @@ uint8_t cm1106_checksum(const uint8_t *response, size_t len) {
 }
 
 void CM1106SLNSComponent::setup() {
-  // Initialization moved to update() on first call
   uint8_t response[8] = {0};
   if (!this->cm1106_write_command_(C_M1106_CMD_GET_CO2, sizeof(C_M1106_CMD_GET_CO2), response, sizeof(response))) {
     ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
     this->mark_failed();
     return;
   }
+  this->setup1106_();
 }
 
 void CM1106SLNSComponent::setup1106_() {
@@ -52,6 +52,23 @@ void CM1106SLNSComponent::setup1106_() {
       ESP_LOGCONFIG(TAG, "  Serial Number: %s", serial_buf);
     } else {
       ESP_LOGW(TAG, "  Failed to read serial number");
+    }
+
+    uint8_t abc_status = 0;
+    uint8_t abc_cycle_days = 0;
+    uint16_t abc_baseline = 0;
+    if (this->cm1106_get_abc_parameters_(&abc_status, &abc_cycle_days, &abc_baseline)) {
+      const char *abc_status_str = (abc_status == 0x00) ? "active" : (abc_status == 0x02) ? "inactive" : "unknown";
+      ESP_LOGCONFIG(TAG, "  ABC: %s (0x%02X), cycle=%u days, baseline=%u ppm", abc_status_str, abc_status,
+                    abc_cycle_days, abc_baseline);
+      if (this->abc_status_sensor_ != nullptr)
+        this->abc_status_sensor_->publish_state(abc_status);
+      if (this->abc_cycle_days_sensor_ != nullptr)
+        this->abc_cycle_days_sensor_->publish_state(abc_cycle_days);
+      if (this->abc_baseline_sensor_ != nullptr)
+        this->abc_baseline_sensor_->publish_state(abc_baseline);
+    } else {
+      ESP_LOGW(TAG, "  Failed to read ABC parameters");
     }
     
     // Step 1: Detect current working mode
@@ -434,6 +451,53 @@ bool CM1106SLNSComponent::cm1106_get_serial_number_(char *serial, size_t len) {
   return true;
 }
 
+bool CM1106SLNSComponent::cm1106_get_abc_parameters_(uint8_t *status, uint8_t *cycle_days, uint16_t *baseline) {
+  // Get ABC parameters from sensor
+  // Command: [0x11][0x01][0x0F][CS] (4 bytes)
+  // Response: [0x16][0x07][0x0F][RESERVED][STATUS][CYCLE][BASELINE_H][BASELINE_L][RESERVED][CS] (10 bytes)
+  // STATUS: 0x00 = ABC active, 0x02 = ABC inactive
+
+  if (status == nullptr || cycle_days == nullptr || baseline == nullptr) {
+    return false;
+  }
+
+  uint8_t cmd[4] = {0x11, 0x01, 0x0F, 0x00};
+  cmd[3] = cm1106_checksum(cmd, 4);
+
+  ESP_LOGD(TAG, "Sending GET ABC parameters command: 0x11 0x01 0x0F 0x%02X", cmd[3]);
+
+  uint8_t response[10] = {0};
+  if (!this->cm1106_write_command_(cmd, sizeof(cmd), response, sizeof(response))) {
+    ESP_LOGW(TAG, "Failed to read ABC parameters!");
+    this->status_set_warning();
+    return false;
+  }
+
+  if (response[0] != 0x16 || response[1] != 0x07 || response[2] != 0x0F) {
+    ESP_LOGW(TAG, "Invalid ABC parameters response: 0x%02X 0x%02X 0x%02X",
+             response[0], response[1], response[2]);
+    this->status_set_warning();
+    return false;
+  }
+
+  uint8_t expected_cs = cm1106_checksum(response, sizeof(response));
+  if (response[9] != expected_cs) {
+    ESP_LOGW(TAG, "ABC parameters response checksum mismatch: expected 0x%02X, got 0x%02X",
+             expected_cs, response[9]);
+    this->status_set_warning();
+    return false;
+  }
+
+  *status = response[4];
+  *cycle_days = response[5];
+  *baseline = (response[6] << 8) | response[7];
+
+  this->status_clear_warning();
+  ESP_LOGD(TAG, "GET ABC parameters: status=0x%02X, cycle=%u days, baseline=%u ppm", *status, *cycle_days,
+           *baseline);
+  return true;
+}
+
 bool CM1106SLNSComponent::cm1106_get_measurement_period_(uint16_t *period, uint8_t *smoothing) {
   // Get measurement period and smoothing samples from sensor
   // Command: [0x11][0x01][0x50][CS] (4 bytes)
@@ -583,6 +647,9 @@ bool CM1106SLNSComponent::cm1106_write_command_(const uint8_t *command, size_t c
 void CM1106SLNSComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CM1106SL-NS:");
   LOG_SENSOR("  ", "CO2", this->co2_sensor_);
+  LOG_SENSOR("  ", "ABC Status", this->abc_status_sensor_);
+  LOG_SENSOR("  ", "ABC Cycle Days", this->abc_cycle_days_sensor_);
+  LOG_SENSOR("  ", "ABC Baseline", this->abc_baseline_sensor_);
   ESP_LOGCONFIG(TAG, "  Config Period: %u seconds", this->config_period_s_);
   ESP_LOGCONFIG(TAG, "  Smoothing Samples: %u", this->smoothing_samples_);
   this->check_uart_settings(9600);
