@@ -1,0 +1,1368 @@
+esphome:
+  name: airq32-w
+  friendly_name: AirQ32-W
+  on_boot:
+    - delay: 5s
+    - lvgl.widget.hide: boot_screen  
+
+external_components:
+  #- source: github://rafaalbelda/cm1106sl_ns@i2c
+  - source: github://rafaalbelda/cm1106sl_ns@uart
+    components: [cm1106sl_ns]
+    refresh: 1h #0s
+#     - source:
+#       type: git
+#       url: https://github.com/rafaalbelda/cm1106sl_ns
+#       ref: 44633e2c3778459598545e45e99cbe86a7a98294
+#     components: [ cm1106sl_ns ]
+#     refresh: 
+
+esp32:
+  board: az-delivery-devkit-v4
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+#  level: VERBOSE
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "uhFm0oRZ0fpToy++Jzl9+TA3RLc9XQtwrNOjH5qgexw="
+
+  # on_client_connected:
+  #   - wait_until:
+  #       condition:
+  #         api.connected:
+  #           state_subscription_only: true
+  #   - lvgl.widget.show: lbl_hastatus
+  # on_client_disconnected:
+  #   - if:
+  #       condition:
+  #         lambda: 'return (0 == client_info.find("Home Assistant "));'
+  #       then:
+  #         - lvgl.widget.hide: lbl_hastatus
+
+ota:
+  - platform: esphome
+    password: "a165369f9c6b3dcd1412a7be6b47a7fa"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Airq32-W Fallback Hotspot"
+    password: "GIMdxfQ2fVOu"
+
+captive_portal:
+
+uart:
+  - id: uart_pm
+    rx_pin: 16
+    tx_pin: 17
+    baud_rate: 9600
+    rx_timeout: 10
+  #  debug:
+  - id: uart_cm
+    rx_pin: 33
+    tx_pin: 32
+    baud_rate: 9600
+  #  debug:
+
+i2c:
+  - id: i2c_main
+    sda: GPIO21
+    scl: GPIO22
+    scan: true
+
+globals:
+  - id: aqi_history
+    type: float[10]
+    restore_value: false
+    initial_value: '{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}'
+
+spi:
+  - id: spi_bus
+    clk_pin: 18
+    mosi_pin: 23
+    #miso_pin: 19
+
+sensor:
+  # - platform: cm1106
+  #   uart_id: uart_cm
+  #   co2:
+  #     name: CO2
+  - platform: cm1106sl_ns
+    id: my_co2
+    uart_id: uart_cm
+    update_interval: 60s
+    config_period: 60
+    smoothing_samples: 2
+    abc_active: true
+    abc_cycle_days: 7
+    abc_baseline: 400
+    co2:
+      name: "CO2 Level"
+      id: co2
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: lvgl_co2_value
+              text:
+                format: "%.0f"
+                args: [ 'x' ]
+                if_nan: "--"
+
+  - platform: bme280_i2c
+    i2c_id: i2c_main
+    address: 0x76
+    temperature:
+      name: "Temperatura"
+      id: my_temperature
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: [lvgl_temperature_value, lvgl_temperature_value_p1]
+              text:
+                format: "%.1f"
+                args: [ 'x' ]
+                if_nan: "--"
+    pressure:
+      name: "Presión"
+      id: my_pressure
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: [lvgl_pressure_value, lvgl_pressure_value_p1]
+              text:
+                format: "%.0f"
+                args: [ 'x' ]
+                if_nan: "--"
+    humidity:
+      name: "Humedad"
+      id: my_humidity
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: [lvgl_humidity_value, lvgl_humidity_value_p1]
+              text:
+                format: "%.1f"
+                args: [ 'x' ]
+                if_nan: "--"
+    update_interval: 60s  # Synchronized with CO2 sensor 
+
+  - platform: absolute_humidity
+    name: Absolute Humidity
+    temperature: my_temperature
+    humidity: my_humidity
+
+  - platform: pmsx003
+    uart_id: uart_pm
+    type: PMSX003
+    pm_1_0:
+      name: "PM1.0"
+      id: pm1_sensor
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: lvgl_pm1_value_p1
+              text:
+                format: "%.0f"
+                args: [ 'x' ]
+                if_nan: "--"
+    pm_2_5:
+      name: "PM2.5"
+      id: pm25_sensor
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: lvgl_pm25_value_p1
+              text:
+                format: "%.0f"
+                args: [ 'x' ]
+                if_nan: "--"
+    pm_10_0:
+      name: "PM10"
+      id: pm10_sensor
+      on_value:
+        then:
+          - lvgl.label.update:
+              id: lvgl_pm10_value_p1
+              text:
+                format: "%.0f"
+                args: [ 'x' ]
+                if_nan: "--"
+    update_interval: 30s  # Synchronized with other sensors
+
+  - platform: aqi
+    name: "European Air Quality Index"
+    pm_2_5: pm25_sensor
+    pm_10_0: pm10_sensor
+    calculation_type: CAQI
+    id: euaqi
+    on_value:
+      then:
+        - lambda: |-
+            if (x != x) {
+              return;
+            }
+            for (size_t i = 0; i < 9; i++) {
+              id(aqi_history)[i] = id(aqi_history)[i + 1];
+            }
+            id(aqi_history)[9] = x;
+        - lvgl.label.update:
+            id: [lvgl_aqi_value_p1, lvgl_aqi_value_p2]
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+              if_nan: "--"
+        - lvgl.line.update:
+            id: [lvgl_aqi_history_line_green, lvgl_aqi_history_line_yellow, lvgl_aqi_history_line_orange, lvgl_aqi_history_line_red, lvgl_aqi_history_line_purple]
+            points:
+              - x: 26
+                y: !lambda |-
+                  float v = id(aqi_history)[0];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 54
+                y: !lambda |-
+                  float v = id(aqi_history)[1];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 82
+                y: !lambda |-
+                  float v = id(aqi_history)[2];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 110
+                y: !lambda |-
+                  float v = id(aqi_history)[3];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 138
+                y: !lambda |-
+                  float v = id(aqi_history)[4];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 166
+                y: !lambda |-
+                  float v = id(aqi_history)[5];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 194
+                y: !lambda |-
+                  float v = id(aqi_history)[6];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 222
+                y: !lambda |-
+                  float v = id(aqi_history)[7];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 250
+                y: !lambda |-
+                  float v = id(aqi_history)[8];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+              - x: 278
+                y: !lambda |-
+                  float v = id(aqi_history)[9];
+                  if (v < 0.0f) return 86;
+                  if (v > 125.0f) v = 125.0f;
+                  return (int) (86.0f - (v * 66.0f / 125.0f));
+        - if:
+            condition:
+              lambda: 'return x <= 25.0;'
+            then:
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_card, lvgl_aqi_card_p2]
+                  bg_color: 0x14241C
+                  border_color: 0x2DD36F
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_icon_box, lvgl_aqi_icon_box_p2]
+                  bg_color: 0x1E3A2B
+                  border_color: 0x2DD36F
+              - lvgl.widget.show: lvgl_aqi_history_line_green
+              - lvgl.widget.hide: [lvgl_aqi_history_line_yellow, lvgl_aqi_history_line_orange, lvgl_aqi_history_line_red, lvgl_aqi_history_line_purple]
+              - lvgl.label.update:
+                  id: [lvgl_aqi_icon, lvgl_aqi_title, lvgl_aqi_value_p1, lvgl_aqi_status, lvgl_aqi_icon_p2, lvgl_aqi_title_p2, lvgl_aqi_value_p2, lvgl_aqi_status_p2]
+                  text_color: 0x2DD36F
+              - lvgl.label.update:
+                  id: [lvgl_aqi_status, lvgl_aqi_status_p2]
+                  text: "Muy bajo"
+        - if:
+            condition:
+              lambda: 'return x > 25.0 && x <= 50.0;'
+            then:
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_card, lvgl_aqi_card_p2]
+                  bg_color: 0x2B2815
+                  border_color: 0xF8D64E
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_icon_box, lvgl_aqi_icon_box_p2]
+                  bg_color: 0x3D3715
+                  border_color: 0xF8D64E
+              - lvgl.widget.show: lvgl_aqi_history_line_yellow
+              - lvgl.widget.hide: [lvgl_aqi_history_line_green, lvgl_aqi_history_line_orange, lvgl_aqi_history_line_red, lvgl_aqi_history_line_purple]
+              - lvgl.label.update:
+                  id: [lvgl_aqi_icon, lvgl_aqi_title, lvgl_aqi_value_p1, lvgl_aqi_status, lvgl_aqi_icon_p2, lvgl_aqi_title_p2, lvgl_aqi_value_p2, lvgl_aqi_status_p2]
+                  text_color: 0xF8D64E
+              - lvgl.label.update:
+                  id: [lvgl_aqi_status, lvgl_aqi_status_p2]
+                  text: "Bajo"
+        - if:
+            condition:
+              lambda: 'return x > 50.0 && x <= 75.0;'
+            then:
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_card, lvgl_aqi_card_p2]
+                  bg_color: 0x2D2014
+                  border_color: 0xFF8C1A
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_icon_box, lvgl_aqi_icon_box_p2]
+                  bg_color: 0x402812
+                  border_color: 0xFF8C1A
+              - lvgl.widget.show: lvgl_aqi_history_line_orange
+              - lvgl.widget.hide: [lvgl_aqi_history_line_green, lvgl_aqi_history_line_yellow, lvgl_aqi_history_line_red, lvgl_aqi_history_line_purple]
+              - lvgl.label.update:
+                  id: [lvgl_aqi_icon, lvgl_aqi_title, lvgl_aqi_value_p1, lvgl_aqi_status, lvgl_aqi_icon_p2, lvgl_aqi_title_p2, lvgl_aqi_value_p2, lvgl_aqi_status_p2]
+                  text_color: 0xFF8C1A
+              - lvgl.label.update:
+                  id: [lvgl_aqi_status, lvgl_aqi_status_p2]
+                  text: "Medio"
+        - if:
+            condition:
+              lambda: 'return x > 75.0 && x <= 100.0;'
+            then:
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_card, lvgl_aqi_card_p2]
+                  bg_color: 0x301818
+                  border_color: 0xFF4D4D
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_icon_box, lvgl_aqi_icon_box_p2]
+                  bg_color: 0x431D1D
+                  border_color: 0xFF4D4D
+              - lvgl.widget.show: lvgl_aqi_history_line_red
+              - lvgl.widget.hide: [lvgl_aqi_history_line_green, lvgl_aqi_history_line_yellow, lvgl_aqi_history_line_orange, lvgl_aqi_history_line_purple]
+              - lvgl.label.update:
+                  id: [lvgl_aqi_icon, lvgl_aqi_title, lvgl_aqi_value_p1, lvgl_aqi_status, lvgl_aqi_icon_p2, lvgl_aqi_title_p2, lvgl_aqi_value_p2, lvgl_aqi_status_p2]
+                  text_color: 0xFF4D4D
+              - lvgl.label.update:
+                  id: [lvgl_aqi_status, lvgl_aqi_status_p2]
+                  text: "Alto"
+        - if:
+            condition:
+              lambda: 'return x > 100.0;'
+            then:
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_card, lvgl_aqi_card_p2]
+                  bg_color: 0x241B32
+                  border_color: 0xB26CFF
+              - lvgl.widget.update:
+                  id: [lvgl_aqi_icon_box, lvgl_aqi_icon_box_p2]
+                  bg_color: 0x322344
+                  border_color: 0xB26CFF
+              - lvgl.widget.show: lvgl_aqi_history_line_purple
+              - lvgl.widget.hide: [lvgl_aqi_history_line_green, lvgl_aqi_history_line_yellow, lvgl_aqi_history_line_orange, lvgl_aqi_history_line_red]
+              - lvgl.label.update:
+                  id: [lvgl_aqi_icon, lvgl_aqi_title, lvgl_aqi_value_p1, lvgl_aqi_status, lvgl_aqi_icon_p2, lvgl_aqi_title_p2, lvgl_aqi_value_p2, lvgl_aqi_status_p2]
+                  text_color: 0xB26CFF
+              - lvgl.label.update:
+                  id: [lvgl_aqi_status, lvgl_aqi_status_p2]
+                  text: "Muy alto"
+        - lvgl.label.update:
+            id: lvgl_aqi_value_p3
+            text:
+              format: "%.1f"
+              args: [ 'x' ]
+              if_nan: "--"
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+        number: GPIO14
+        mode: INPUT_PULLUP
+        inverted: true
+    name: "Button"
+    id: toggle_display
+    on_press:
+      then:
+      - display.page.show_next: my_display
+      - lvgl.page.next:
+          animation: OUT_LEFT
+          time: 300ms
+
+# Define a PWM output on the ESP32
+output:
+  - platform: ledc
+    pin: GPIO15
+    id: backlight_pwm
+
+# Define a monochromatic, dimmable light for the backlight
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "Display Backlight"
+    id: back_light
+    restore_mode: ALWAYS_ON
+
+
+font:
+    # gfonts://family[@weight]
+  - file: "gfonts://Roboto"
+    id: font10
+    size: 10
+  - file: "gfonts://Roboto"
+    id: font16
+    size: 16
+  - file: "gfonts://Roboto"
+    id: font32
+    size: 32
+  - file: "gfonts://Roboto"
+    id: font48
+    size: 48
+  - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    id: mdi_icons_18
+    size: 18
+    bpp: 4
+    glyphs: [
+      "\U000F0D43", # mdi-air-filter
+      "\U000F07E4", # mdi-molecule-co2
+      "\U000F00B5", # mdi-blur
+      "\U000F050F", # mdi-thermometer
+      "\U000F058E", # mdi-water-percent
+      "\U000F029A", # mdi-gauge
+      ]
+
+image:
+  - file: https://media.esphome.io/logo/logo.png
+    id: boot_logo
+    resize: 200x200
+    type: RGB565
+    transparency: alpha_channel
+
+lvgl:
+  displays:
+    - my_display1
+  default_font: font16
+  bottom_layer:
+    bg_color: 0x000000
+    bg_opa: COVER
+
+  pages:
+    - id: lvgl_page1
+      bg_color: 0x101418
+      bg_opa: COVER
+      widgets:
+        - obj:
+            x: 0
+            y: 0
+            width: 320
+            height: 240
+            bg_color: 0x101418
+            bg_opa: TRANSP
+            border_width: 0
+            radius: 0
+            pad_all: 0
+            widgets:
+              - obj:
+                  id: lvgl_aqi_card
+                  x: 8
+                  y: 8
+                  width: 148
+                  height: 112
+                  bg_color: 0x14241C
+                  bg_opa: COVER
+                  border_color: 0x2DD36F
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - obj:
+                        id: lvgl_aqi_icon_box
+                        x: 8
+                        y: 8
+                        width: 28
+                        height: 24
+                        bg_color: 0x1E3A2B
+                        bg_opa: COVER
+                        border_color: 0x2DD36F
+                        border_width: 1
+                        radius: 6
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              id: lvgl_aqi_icon
+                              align: CENTER
+                              text_font: mdi_icons_18
+                              text_color: 0x2DD36F
+                              text: "\U000F0D43"
+                    - label:
+                        id: lvgl_aqi_title
+                        x: 42
+                        y: 10
+                        text_font: font16
+                        text_color: 0xA9F7C3
+                        text: "AQI"
+                    - label:
+                        id: lvgl_aqi_value_p1
+                        x: 8
+                        y: 42
+                        width: 132
+                        text_align: CENTER
+                        text_font: font48
+                        text_color: 0x2DD36F
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(euaqi).state' ]
+                          if_nan: "--"
+                    - label:
+                        id: lvgl_aqi_status
+                        x: 0
+                        y: 94
+                        width: 148
+                        text_align: CENTER
+                        text_font: font10
+                        text_color: 0x2DD36F
+                        text: "Muy bajo"
+              - obj:
+                  x: 164
+                  y: 8
+                  width: 148
+                  height: 112
+                  bg_color: 0x261F14
+                  bg_opa: COVER
+                  border_color: 0xFFB020
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - obj:
+                        x: 8
+                        y: 8
+                        width: 32
+                        height: 24
+                        bg_color: 0x3B2A10
+                        bg_opa: COVER
+                        border_color: 0xFFB020
+                        border_width: 1
+                        radius: 6
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text_font: mdi_icons_18
+                              text_color: 0xFFB020
+                              text: "\U000F07E4"
+                    - label:
+                        x: 46
+                        y: 10
+                        text_font: font16
+                        text_color: 0xFFD58A
+                        text: "CO2"
+                    - label:
+                        id: lvgl_co2_value
+                        x: 8
+                        y: 42
+                        width: 132
+                        text_align: CENTER
+                        text_font: font48
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(co2).state' ]
+                          if_nan: "--"
+                    - label:
+                        x: 0
+                        y: 94
+                        width: 148
+                        text_align: CENTER
+                        text_font: font10
+                        text_color: 0xFFCF70
+                        text: "ppm"
+              - obj:
+                  x: 8
+                  y: 128
+                  width: 96
+                  height: 52
+                  bg_color: 0x151E28
+                  bg_opa: COVER
+                  border_color: 0x26394A
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 7
+                        text_font: mdi_icons_18
+                        text_color: 0x8FC8FF
+                        text: "\U000F00B5"
+                    - label:
+                        x: 32
+                        y: 7
+                        text_font: font10
+                        text_color: 0x8FC8FF
+                        text: "PM1.0"
+                    - label:
+                        id: lvgl_pm1_value_p1
+                        x: 8
+                        y: 25
+                        width: 80
+                        text_align: CENTER
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(pm1_sensor).state' ]
+                          if_nan: "--"
+              - obj:
+                  x: 112
+                  y: 128
+                  width: 96
+                  height: 52
+                  bg_color: 0x151E28
+                  bg_opa: COVER
+                  border_color: 0x26394A
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 7
+                        text_font: mdi_icons_18
+                        text_color: 0x8FC8FF
+                        text: "\U000F00B5"
+                    - label:
+                        x: 32
+                        y: 7
+                        text_font: font10
+                        text_color: 0x8FC8FF
+                        text: "PM2.5"
+                    - label:
+                        id: lvgl_pm25_value_p1
+                        x: 8
+                        y: 25
+                        width: 80
+                        text_align: CENTER
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(pm25_sensor).state' ]
+                          if_nan: "--"
+              - obj:
+                  x: 216
+                  y: 128
+                  width: 96
+                  height: 52
+                  bg_color: 0x151E28
+                  bg_opa: COVER
+                  border_color: 0x26394A
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 7
+                        text_font: mdi_icons_18
+                        text_color: 0x8FC8FF
+                        text: "\U000F00B5"
+                    - label:
+                        x: 32
+                        y: 7
+                        text_font: font10
+                        text_color: 0x8FC8FF
+                        text: "PM10"
+                    - label:
+                        id: lvgl_pm10_value_p1
+                        x: 8
+                        y: 25
+                        width: 80
+                        text_align: CENTER
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(pm10_sensor).state' ]
+                          if_nan: "--"
+              - obj:
+                  x: 8
+                  y: 188
+                  width: 96
+                  height: 44
+                  bg_color: 0x111A22
+                  bg_opa: COVER
+                  border_color: 0x1F3140
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 5
+                        text_font: mdi_icons_18
+                        text_color: 0x6AD8FF
+                        text: "\U000F050F"
+                    - label:
+                        x: 32
+                        y: 5
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "TEMP"
+                    - label:
+                        id: lvgl_temperature_value_p1
+                        x: 8
+                        y: 22
+                        width: 58
+                        text_align: RIGHT
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.1f"
+                          args: [ 'id(my_temperature).state' ]
+                          if_nan: "--"
+                    - label:
+                        x: 68
+                        y: 25
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "C"
+              - obj:
+                  x: 112
+                  y: 188
+                  width: 96
+                  height: 44
+                  bg_color: 0x111A22
+                  bg_opa: COVER
+                  border_color: 0x1F3140
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 5
+                        text_font: mdi_icons_18
+                        text_color: 0x6AD8FF
+                        text: "\U000F058E"
+                    - label:
+                        x: 32
+                        y: 5
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "HUM"
+                    - label:
+                        id: lvgl_humidity_value_p1
+                        x: 8
+                        y: 22
+                        width: 58
+                        text_align: RIGHT
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.1f"
+                          args: [ 'id(my_humidity).state' ]
+                          if_nan: "--"
+                    - label:
+                        x: 68
+                        y: 25
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "%"
+              - obj:
+                  x: 216
+                  y: 188
+                  width: 96
+                  height: 44
+                  bg_color: 0x111A22
+                  bg_opa: COVER
+                  border_color: 0x1F3140
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 8
+                        y: 5
+                        text_font: mdi_icons_18
+                        text_color: 0x6AD8FF
+                        text: "\U000F029A"
+                    - label:
+                        x: 32
+                        y: 5
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "PRES"
+                    - label:
+                        id: lvgl_pressure_value_p1
+                        x: 6
+                        y: 22
+                        width: 56
+                        text_align: RIGHT
+                        text_font: font16
+                        text_color: 0xFFFFFF
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(my_pressure).state' ]
+                          if_nan: "--"
+                    - label:
+                        x: 64
+                        y: 25
+                        text_font: font10
+                        text_color: 0x6AD8FF
+                        text: "hPa"
+
+    - id: lvgl_page2
+      bg_color: 0x101418
+      bg_opa: COVER
+      widgets:
+        - obj:
+            x: 0
+            y: 0
+            width: 320
+            height: 240
+            bg_color: 0x101418
+            bg_opa: TRANSP
+            border_width: 0
+            radius: 0
+            pad_all: 0
+            widgets:
+              - obj:
+                  id: lvgl_aqi_card_p2
+                  x: 8
+                  y: 8
+                  width: 304
+                  height: 86
+                  bg_color: 0x14241C
+                  bg_opa: COVER
+                  border_color: 0x2DD36F
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - obj:
+                        id: lvgl_aqi_icon_box_p2
+                        x: 10
+                        y: 10
+                        width: 32
+                        height: 28
+                        bg_color: 0x1E3A2B
+                        bg_opa: COVER
+                        border_color: 0x2DD36F
+                        border_width: 1
+                        radius: 6
+                        pad_all: 0
+                        widgets:
+                          - label:
+                              id: lvgl_aqi_icon_p2
+                              align: CENTER
+                              text_font: mdi_icons_18
+                              text_color: 0x2DD36F
+                              text: "\U000F0D43"
+                    - label:
+                        id: lvgl_aqi_title_p2
+                        x: 50
+                        y: 11
+                        text_font: font16
+                        text_color: 0x2DD36F
+                        text: "AQI"
+                    - label:
+                        id: lvgl_aqi_value_p2
+                        x: 118
+                        y: 14
+                        width: 96
+                        text_align: CENTER
+                        text_font: font48
+                        text_color: 0x2DD36F
+                        text:
+                          format: "%.0f"
+                          args: [ 'id(euaqi).state' ]
+                          if_nan: "--"
+                    - label:
+                        id: lvgl_aqi_status_p2
+                        x: 218
+                        y: 21
+                        width: 78
+                        text_align: CENTER
+                        text_font: font16
+                        text_color: 0x2DD36F
+                        text: "Muy bajo"
+                    - label:
+                        x: 14
+                        y: 58
+                        text_font: font10
+                        text_color: 0x2DD36F
+                        text: "Muy bajo"
+                    - label:
+                        x: 74
+                        y: 58
+                        text_font: font10
+                        text_color: 0xF8D64E
+                        text: "Bajo"
+                    - label:
+                        x: 122
+                        y: 58
+                        text_font: font10
+                        text_color: 0xFF8C1A
+                        text: "Medio"
+                    - label:
+                        x: 176
+                        y: 58
+                        text_font: font10
+                        text_color: 0xFF4D4D
+                        text: "Alto"
+                    - label:
+                        x: 222
+                        y: 58
+                        text_font: font10
+                        text_color: 0xB26CFF
+                        text: "Muy alto"
+              - obj:
+                  x: 8
+                  y: 102
+                  width: 304
+                  height: 130
+                  bg_color: 0x111A22
+                  bg_opa: COVER
+                  border_color: 0x1F3140
+                  border_width: 1
+                  radius: 8
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        x: 12
+                        y: 8
+                        text_font: font16
+                        text_color: 0x8FC8FF
+                        text: "Evolucion AQI"
+                    - label:
+                        x: 8
+                        y: 26
+                        text_font: font10
+                        text_color: 0x5B7388
+                        text: "100"
+                    - label:
+                        x: 14
+                        y: 58
+                        text_font: font10
+                        text_color: 0x5B7388
+                        text: "50"
+                    - label:
+                        x: 20
+                        y: 91
+                        text_font: font10
+                        text_color: 0x5B7388
+                        text: "0"
+                    - line:
+                        points:
+                          - 32, 20
+                          - 292, 20
+                        line_color: 0x223344
+                        line_width: 1
+                    - line:
+                        points:
+                          - 32, 53
+                          - 292, 53
+                        line_color: 0x223344
+                        line_width: 1
+                    - line:
+                        points:
+                          - 32, 86
+                          - 292, 86
+                        line_color: 0x223344
+                        line_width: 1
+                    - line:
+                        points:
+                          - 32, 20
+                          - 32, 86
+                        line_color: 0x223344
+                        line_width: 1
+                    - line:
+                        id: lvgl_aqi_history_line_green
+                        points:
+                          - 26, 86
+                          - 54, 86
+                          - 82, 86
+                          - 110, 86
+                          - 138, 86
+                          - 166, 86
+                          - 194, 86
+                          - 222, 86
+                          - 250, 86
+                          - 278, 86
+                        line_color: 0x2DD36F
+                        line_width: 3
+                        line_rounded: true
+                    - line:
+                        id: lvgl_aqi_history_line_yellow
+                        hidden: true
+                        points:
+                          - 26, 86
+                          - 54, 86
+                          - 82, 86
+                          - 110, 86
+                          - 138, 86
+                          - 166, 86
+                          - 194, 86
+                          - 222, 86
+                          - 250, 86
+                          - 278, 86
+                        line_color: 0xF8D64E
+                        line_width: 3
+                        line_rounded: true
+                    - line:
+                        id: lvgl_aqi_history_line_orange
+                        hidden: true
+                        points:
+                          - 26, 86
+                          - 54, 86
+                          - 82, 86
+                          - 110, 86
+                          - 138, 86
+                          - 166, 86
+                          - 194, 86
+                          - 222, 86
+                          - 250, 86
+                          - 278, 86
+                        line_color: 0xFF8C1A
+                        line_width: 3
+                        line_rounded: true
+                    - line:
+                        id: lvgl_aqi_history_line_red
+                        hidden: true
+                        points:
+                          - 26, 86
+                          - 54, 86
+                          - 82, 86
+                          - 110, 86
+                          - 138, 86
+                          - 166, 86
+                          - 194, 86
+                          - 222, 86
+                          - 250, 86
+                          - 278, 86
+                        line_color: 0xFF4D4D
+                        line_width: 3
+                        line_rounded: true
+                    - line:
+                        id: lvgl_aqi_history_line_purple
+                        hidden: true
+                        points:
+                          - 26, 86
+                          - 54, 86
+                          - 82, 86
+                          - 110, 86
+                          - 138, 86
+                          - 166, 86
+                          - 194, 86
+                          - 222, 86
+                          - 250, 86
+                          - 278, 86
+                        line_color: 0xB26CFF
+                        line_width: 3
+                        line_rounded: true
+
+    - id: lvgl_page3
+      bg_color: 0x000000
+      bg_opa: COVER
+      widgets:
+        - obj:
+            x: 0
+            y: 0
+            width: 320
+            height: 240
+            bg_opa: TRANSP
+            border_color: 0xFFFFFF
+            border_width: 2
+            radius: 0
+            pad_all: 0
+            widgets:
+              - line:
+                  points:
+                    - 1, 120
+                    - 319, 120
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - line:
+                  points:
+                    - 107, 120
+                    - 107, 239
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - line:
+                  points:
+                    - 213, 120
+                    - 213, 239
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - label:
+                  x: 8
+                  y: 8
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text: "AQI:"
+              - label:
+                  id: lvgl_aqi_value_p3
+                  align: TOP_MID
+                  y: 34
+                  width: 180
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(euaqi).state' ]
+                    if_nan: "--"
+              - label:
+                  x: 8
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "T:"
+              - label:
+                  id: lvgl_temperature_value
+                  x: 0
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(my_temperature).state' ]
+                    if_nan: "--"
+              - label:
+                  x: 115
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "H:"
+              - label:
+                  id: lvgl_humidity_value
+                  x: 107
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(my_humidity).state' ]
+                    if_nan: "--"
+              - label:
+                  x: 221
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "P:"
+              - label:
+                  id: lvgl_pressure_value
+                  x: 213
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.0f"
+                    args: [ 'id(my_pressure).state' ]
+                    if_nan: "--"
+
+  top_layer:
+    widgets:
+      # - label:
+      #     text: "\uF1EB"
+      #     id: lbl_hastatus
+      #     hidden: true
+      #     align: top_right
+      #     x: -2
+      #     y: 7
+      #     text_align: right
+      #     text_color: 0xFFFFFF
+        
+      # make sure it's the last one in this list:
+      - obj:
+          id: boot_screen
+          x: 0
+          y: 0
+          width: 100%
+          height: 100%
+          bg_color: 0xffffff
+          bg_opa: COVER
+          radius: 0
+          pad_all: 0
+          border_width: 0
+          widgets:
+            - image:
+                align: CENTER
+                src: boot_logo
+                y: -50
+            - spinner:
+                align: CENTER
+                y: 50
+                height: 50
+                width: 50
+                spin_time: 1s
+                arc_length: 60deg
+                arc_width: 8
+                indicator:
+                  arc_color: 0x18bcf2
+                  arc_width: 8
+          on_press:
+            - lvgl.widget.hide: boot_screen
+
+
+display:
+#   - platform: ili9xxx
+#     model: ili9342
+#     cs_pin: 4 
+#     dc_pin: 2
+#     reset_pin: 0
+#     invert_colors: true
+# #    dimensions: 240x320
+#     color_palette: 8BIT
+#     rotation: 0
+
+  - platform: ili9xxx
+    id: my_display1
+    model: ili9342
+    cs_pin: 4 
+    dc_pin: 2
+    reset_pin: 0
+    color_palette: 8BIT
+    invert_colors: false
+    #update_interval: 20s
+    auto_clear_enabled: false
+    #show_test_card: true
+    ## 90 degrees - use swap_xy with mirror_x
+    ## 180 degrees - use mirror_x with mirror_y
+    ## 270 degrees - use swap_xy with mirror_y
+    ## With 90 and 270 rotations you will also need to swap the dimensions ‘’height’’ and ‘’width’’
+    ## normal: height 320, width 240
+    # transform:
+    #   mirror_x: false
+    #   mirror_y: true
+    # dimensions:
+    #   height: 320
+    #   width: 240
+    ## rotated 90
+    transform:
+      swap_xy: true
+      mirror_x: true
+      mirror_y: true
+    dimensions:
+      height: 240
+      width: 320
+
+    # lambda: |-
+    #   it.fill(Color(255, 0, 0));
+
+  
+  - platform: ssd1306_i2c
+    i2c_id: i2c_main
+    model: "SSD1306 128x64"
+    #address: 0x3C
+    # rotation: 180°
+    # contrast: 80%
+    # flip_x: true
+    # flip_y: false
+    id: my_display
+    pages:
+       - id: page1
+         lambda: |-
+            // Clear the display
+            it.fill(COLOR_OFF);
+            
+            int h = it.get_height();
+            int w = it.get_width();
+            
+            // Draw a rectangle
+            it.rectangle(0, 0, w, h);
+
+            it.line(1, h/2, w-1, h/2);
+
+
+            // Print AQI
+            it.print(3, 3, id(font16), "AQI:");
+            it.printf(w/2, h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(euaqi).state);
+
+            // Print CO2
+            it.print(3, h/2+3, id(font16), "CO2:");
+            it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(co2).state);
+            //it.printf(w/2, 3*h/4, id(font32), display::TextAlign::CENTER, "%.0f", id(my_co2).state);
+       - id: page2
+         lambda: |-
+            // Clear the display
+            it.fill(COLOR_OFF);
+            
+            int h = it.get_height();
+            int w = it.get_width();
+            
+            // Draw a rectangle
+            it.rectangle(0, 0, w, h);
+
+            it.line(1, h/2, w-1, h/2);
+            it.line(w/3, h/2, w/3, h);
+            it.line(2*w/3, h/2, 2*w/3, h);
+
+            // Print AQI
+            it.print(3, 3, id(font16), "AQI:");
+            it.printf(w/2, h/4, id(font32), display::TextAlign::CENTER, "%.1f", id(euaqi).state);
+
+            // Print PM1.0
+            it.print(2, h/2+2, id(font10), display::TextAlign::LEFT, "PM1.0:");
+            it.printf(w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(pm1_sensor).state);
+
+            // Print PM2.5
+            it.print(w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "PM2.5:");
+            it.printf(w/2, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(pm25_sensor).state);
+
+            // Print PM10
+            it.print(2*w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "PM10:");
+            it.printf(5*w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(pm10_sensor).state);
+
+       - id: page3
+         lambda: |-
+            // Clear the display
+            it.fill(COLOR_OFF);
+            
+            int h = it.get_height();
+            int w = it.get_width();
+            
+            // Draw a rectangle
+            it.rectangle(0, 0, w, h);
+
+            it.line(1, h/2, w-1, h/2);
+            it.line(w/3, h/2, w/3, h);
+            it.line(2*w/3, h/2, 2*w/3, h);
+
+            // Print AQI
+            it.print(3, 3, id(font16), "AQI:");
+            it.printf(w/2, h/4, id(font32), display::TextAlign::CENTER, "%.1f", id(euaqi).state);
+
+            // Print Ta
+            it.print(2, h/2+2, id(font10), display::TextAlign::LEFT, "T:");
+            it.printf(w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.1f", id(my_temperature).state);
+
+            // Print H
+            it.print(w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "H:");
+            it.printf(w/2, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.1f", id(my_humidity).state);
+
+            // Print P
+            it.print(2*w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "P:");
+            it.printf(5*w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(my_pressure).state);
