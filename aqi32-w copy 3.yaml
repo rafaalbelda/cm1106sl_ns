@@ -83,10 +83,6 @@ globals:
     type: float[10]
     restore_value: false
     initial_value: '{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}'
-  - id: co2_history
-    type: float[10]
-    restore_value: false
-    initial_value: '{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}'
 
 spi:
   - id: spi_bus
@@ -113,190 +109,12 @@ sensor:
       id: co2
       on_value:
         then:
-          - lambda: |-
-              if (x != x) {
-                return;
-              }
-              for (size_t i = 0; i < 9; i++) {
-                id(co2_history)[i] = id(co2_history)[i + 1];
-              }
-              id(co2_history)[9] = x;
           - lvgl.label.update:
-              id: [lvgl_co2_value, lvgl_co2_value_p3]
+              id: lvgl_co2_value
               text:
                 format: "%.0f"
                 args: [ 'x' ]
                 if_nan: "--"
-          - lvgl.widget.update:
-              id: lvgl_co2_scale_marker_p3
-              x: !lambda |-
-                if (x != x) return 12;
-                float v = x;
-                if (v < 400.0f) v = 400.0f;
-                if (v > 2400.0f) v = 2400.0f;
-                if (v < 600.0f) {
-                  return (int) (12.0f + ((v - 400.0f) * 60.0f / 200.0f));
-                }
-                if (v < 1000.0f) {
-                  return (int) (80.0f + ((v - 600.0f) * 60.0f / 400.0f));
-                }
-                if (v <= 2000.0f) {
-                  return (int) (148.0f + ((v - 1000.0f) * 60.0f / 1000.0f));
-                }
-                return (int) (216.0f + ((v - 2000.0f) * 60.0f / 400.0f));
-          - lvgl.line.update:
-              id: [lvgl_co2_history_line_green, lvgl_co2_history_line_yellow, lvgl_co2_history_line_orange, lvgl_co2_history_line_red]
-              points:
-                - x: 42
-                  y: !lambda |-
-                    float v = id(co2_history)[0];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 70
-                  y: !lambda |-
-                    float v = id(co2_history)[1];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 98
-                  y: !lambda |-
-                    float v = id(co2_history)[2];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 126
-                  y: !lambda |-
-                    float v = id(co2_history)[3];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 154
-                  y: !lambda |-
-                    float v = id(co2_history)[4];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 182
-                  y: !lambda |-
-                    float v = id(co2_history)[5];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 210
-                  y: !lambda |-
-                    float v = id(co2_history)[6];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 238
-                  y: !lambda |-
-                    float v = id(co2_history)[7];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 266
-                  y: !lambda |-
-                    float v = id(co2_history)[8];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-                - x: 292
-                  y: !lambda |-
-                    float v = id(co2_history)[9];
-                    if (v < 0.0f) return 96;
-                    if (v < 400.0f) v = 400.0f;
-                    if (v > 2000.0f) v = 2000.0f;
-                    return (int) (96.0f - ((v - 400.0f) * 66.0f / 1600.0f));
-          - if:
-              condition:
-                lambda: 'return x < 600.0;'
-              then:
-                - lvgl.label.update:
-                    id: [lvgl_co2_value, lvgl_co2_value_p3, lvgl_co2_icon_p3, lvgl_co2_title_p3, lvgl_co2_status_p3]
-                    text_color: 0x2DD36F
-                - lvgl.label.update:
-                    id: lvgl_co2_status_p3
-                    text: "Bueno"
-                - lvgl.widget.update:
-                    id: lvgl_co2_card_p3
-                    bg_color: 0x14241C
-                    border_color: 0x2DD36F
-                - lvgl.widget.update:
-                    id: lvgl_co2_icon_box_p3
-                    bg_color: 0x1E3A2B
-                    border_color: 0x2DD36F
-                - lvgl.widget.show: lvgl_co2_history_line_green
-                - lvgl.widget.hide: [lvgl_co2_history_line_yellow, lvgl_co2_history_line_orange, lvgl_co2_history_line_red]
-          - if:
-              condition:
-                lambda: 'return x >= 600.0 && x < 1000.0;'
-              then:
-                - lvgl.label.update:
-                    id: [lvgl_co2_value, lvgl_co2_value_p3, lvgl_co2_icon_p3, lvgl_co2_title_p3, lvgl_co2_status_p3]
-                    text_color: 0xF8D64E
-                - lvgl.label.update:
-                    id: lvgl_co2_status_p3
-                    text: "Aceptable"
-                - lvgl.widget.update:
-                    id: lvgl_co2_card_p3
-                    bg_color: 0x2B2815
-                    border_color: 0xF8D64E
-                - lvgl.widget.update:
-                    id: lvgl_co2_icon_box_p3
-                    bg_color: 0x3D3715
-                    border_color: 0xF8D64E
-                - lvgl.widget.show: lvgl_co2_history_line_yellow
-                - lvgl.widget.hide: [lvgl_co2_history_line_green, lvgl_co2_history_line_orange, lvgl_co2_history_line_red]
-          - if:
-              condition:
-                lambda: 'return x >= 1000.0 && x <= 2000.0;'
-              then:
-                - lvgl.label.update:
-                    id: [lvgl_co2_value, lvgl_co2_value_p3, lvgl_co2_icon_p3, lvgl_co2_title_p3, lvgl_co2_status_p3]
-                    text_color: 0xFF8C1A
-                - lvgl.label.update:
-                    id: lvgl_co2_status_p3
-                    text: "Malo"
-                - lvgl.widget.update:
-                    id: lvgl_co2_card_p3
-                    bg_color: 0x2D2014
-                    border_color: 0xFF8C1A
-                - lvgl.widget.update:
-                    id: lvgl_co2_icon_box_p3
-                    bg_color: 0x402812
-                    border_color: 0xFF8C1A
-                - lvgl.widget.show: lvgl_co2_history_line_orange
-                - lvgl.widget.hide: [lvgl_co2_history_line_green, lvgl_co2_history_line_yellow, lvgl_co2_history_line_red]
-          - if:
-              condition:
-                lambda: 'return x > 2000.0;'
-              then:
-                - lvgl.label.update:
-                    id: [lvgl_co2_value, lvgl_co2_value_p3, lvgl_co2_icon_p3, lvgl_co2_title_p3, lvgl_co2_status_p3]
-                    text_color: 0xFF4D4D
-                - lvgl.label.update:
-                    id: lvgl_co2_status_p3
-                    text: "Muy malo"
-                - lvgl.widget.update:
-                    id: lvgl_co2_card_p3
-                    bg_color: 0x301818
-                    border_color: 0xFF4D4D
-                - lvgl.widget.update:
-                    id: lvgl_co2_icon_box_p3
-                    bg_color: 0x431D1D
-                    border_color: 0xFF4D4D
-                - lvgl.widget.show: lvgl_co2_history_line_red
-                - lvgl.widget.hide: [lvgl_co2_history_line_green, lvgl_co2_history_line_yellow, lvgl_co2_history_line_orange]
 
   - platform: bme280_i2c
     i2c_id: i2c_main
@@ -307,7 +125,7 @@ sensor:
       on_value:
         then:
           - lvgl.label.update:
-              id: lvgl_temperature_value_p1
+              id: [lvgl_temperature_value, lvgl_temperature_value_p1]
               text:
                 format: "%.1f"
                 args: [ 'x' ]
@@ -318,7 +136,7 @@ sensor:
       on_value:
         then:
           - lvgl.label.update:
-              id: lvgl_pressure_value_p1
+              id: [lvgl_pressure_value, lvgl_pressure_value_p1]
               text:
                 format: "%.0f"
                 args: [ 'x' ]
@@ -329,7 +147,7 @@ sensor:
       on_value:
         then:
           - lvgl.label.update:
-              id: lvgl_humidity_value_p1
+              id: [lvgl_humidity_value, lvgl_humidity_value_p1]
               text:
                 format: "%.1f"
                 args: [ 'x' ]
@@ -582,6 +400,13 @@ sensor:
               - lvgl.label.update:
                   id: [lvgl_aqi_status, lvgl_aqi_status_p2]
                   text: "Muy alto"
+        - lvgl.label.update:
+            id: lvgl_aqi_value_p3
+            text:
+              format: "%.1f"
+              args: [ 'x' ]
+              if_nan: "--"
+
 binary_sensor:
   - platform: gpio
     pin: 
@@ -1098,40 +923,30 @@ lvgl:
                     - label:
                         x: 14
                         y: 58
-                        width: 48
-                        text_align: CENTER
                         text_font: font10
                         text_color: 0x2DD36F
                         text: "Muy bajo"
                     - label:
-                        x: 68
+                        x: 74
                         y: 58
-                        width: 48
-                        text_align: CENTER
                         text_font: font10
                         text_color: 0xF8D64E
                         text: "Bajo"
                     - label:
                         x: 122
                         y: 58
-                        width: 48
-                        text_align: CENTER
                         text_font: font10
                         text_color: 0xFF8C1A
                         text: "Medio"
                     - label:
                         x: 176
                         y: 58
-                        width: 48
-                        text_align: CENTER
                         text_font: font10
                         text_color: 0xFF4D4D
                         text: "Alto"
                     - label:
-                        x: 230
+                        x: 222
                         y: 58
-                        width: 48
-                        text_align: CENTER
                         text_font: font10
                         text_color: 0xB26CFF
                         text: "Muy alto"
@@ -1382,7 +1197,7 @@ lvgl:
                         line_rounded: true
 
     - id: lvgl_page3
-      bg_color: 0x101418
+      bg_color: 0x000000
       bg_opa: COVER
       widgets:
         - obj:
@@ -1390,271 +1205,102 @@ lvgl:
             y: 0
             width: 320
             height: 240
-            bg_color: 0x101418
             bg_opa: TRANSP
-            border_width: 0
+            border_color: 0xFFFFFF
+            border_width: 2
             radius: 0
             pad_all: 0
             widgets:
-              - obj:
-                  id: lvgl_co2_card_p3
+              - line:
+                  points:
+                    - 1, 120
+                    - 319, 120
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - line:
+                  points:
+                    - 107, 120
+                    - 107, 239
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - line:
+                  points:
+                    - 213, 120
+                    - 213, 239
+                  line_color: 0xFFFFFF
+                  line_width: 2
+              - label:
                   x: 8
                   y: 8
-                  width: 304
-                  height: 86
-                  bg_color: 0x2B2815
-                  bg_opa: COVER
-                  border_color: 0xF8D64E
-                  border_width: 1
-                  radius: 8
-                  pad_all: 0
-                  widgets:
-                    - obj:
-                        id: lvgl_co2_icon_box_p3
-                        x: 10
-                        y: 10
-                        width: 32
-                        height: 28
-                        bg_color: 0x3D3715
-                        bg_opa: COVER
-                        border_color: 0xF8D64E
-                        border_width: 1
-                        radius: 6
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              id: lvgl_co2_icon_p3
-                              align: CENTER
-                              text_font: mdi_icons_18
-                              text_color: 0xF8D64E
-                              text: "\U000F07E4"
-                    - label:
-                        id: lvgl_co2_title_p3
-                        x: 50
-                        y: 11
-                        text_font: font16
-                        text_color: 0xF8D64E
-                        text: "CO2"
-                    - label:
-                        id: lvgl_co2_value_p3
-                        x: 118
-                        y: 10
-                        width: 96
-                        text_align: CENTER
-                        text_font: font48
-                        text_color: 0xF8D64E
-                        text:
-                          format: "%.0f"
-                          args: [ 'id(co2).state' ]
-                          if_nan: "--"
-                    - label:
-                        id: lvgl_co2_status_p3
-                        x: 216
-                        y: 21
-                        width: 82
-                        text_align: CENTER
-                        text_font: font16
-                        text_color: 0xF8D64E
-                        text: "Aceptable"
-                    - label:
-                        x: 14
-                        y: 58
-                        width: 60
-                        text_align: CENTER
-                        text_font: font10
-                        text_color: 0x2DD36F
-                        text: "Bueno"
-                    - label:
-                        x: 82
-                        y: 58
-                        width: 60
-                        text_align: CENTER
-                        text_font: font10
-                        text_color: 0xF8D64E
-                        text: "Aceptable"
-                    - label:
-                        x: 150
-                        y: 58
-                        width: 60
-                        text_align: CENTER
-                        text_font: font10
-                        text_color: 0xFF8C1A
-                        text: "Malo"
-                    - label:
-                        x: 218
-                        y: 58
-                        width: 60
-                        text_align: CENTER
-                        text_font: font10
-                        text_color: 0xFF4D4D
-                        text: "Muy malo"
-                    - line:
-                        points:
-                          - 14, 75
-                          - 74, 75
-                        line_color: 0x2DD36F
-                        line_width: 5
-                        line_rounded: true
-                    - line:
-                        points:
-                          - 82, 75
-                          - 142, 75
-                        line_color: 0xF8D64E
-                        line_width: 5
-                        line_rounded: true
-                    - line:
-                        points:
-                          - 150, 75
-                          - 210, 75
-                        line_color: 0xFF8C1A
-                        line_width: 5
-                        line_rounded: true
-                    - line:
-                        points:
-                          - 218, 75
-                          - 278, 75
-                        line_color: 0xFF4D4D
-                        line_width: 5
-                        line_rounded: true
-                    - obj:
-                        id: lvgl_co2_scale_marker_p3
-                        x: 12
-                        y: 68
-                        width: 5
-                        height: 14
-                        bg_color: 0xFFFFFF
-                        bg_opa: COVER
-                        border_color: 0x101418
-                        border_width: 1
-                        radius: 2
-                        pad_all: 0
-              - obj:
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text: "AQI:"
+              - label:
+                  id: lvgl_aqi_value_p3
+                  align: TOP_MID
+                  y: 34
+                  width: 180
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(euaqi).state' ]
+                    if_nan: "--"
+              - label:
                   x: 8
-                  y: 102
-                  width: 304
-                  height: 130
-                  bg_color: 0x111A22
-                  bg_opa: COVER
-                  border_color: 0x1F3140
-                  border_width: 1
-                  radius: 8
-                  pad_all: 0
-                  widgets:
-                    - label:
-                        x: 12
-                        y: 6
-                        text_font: font16
-                        text_color: 0xFFCF70
-                        text: "Evolucion CO2"
-                    - label:
-                        x: 6
-                        y: 26
-                        text_font: font10
-                        text_color: 0x5B7388
-                        text: "2000"
-                    - label:
-                        x: 6
-                        y: 58
-                        text_font: font10
-                        text_color: 0x5B7388
-                        text: "1000"
-                    - label:
-                        x: 14
-                        y: 91
-                        text_font: font10
-                        text_color: 0x5B7388
-                        text: "400"
-                    - line:
-                        points:
-                          - 42, 30
-                          - 292, 30
-                        line_color: 0x223344
-                        line_width: 1
-                    - line:
-                        points:
-                          - 42, 63
-                          - 292, 63
-                        line_color: 0x223344
-                        line_width: 1
-                    - line:
-                        points:
-                          - 42, 96
-                          - 292, 96
-                        line_color: 0x223344
-                        line_width: 1
-                    - line:
-                        points:
-                          - 42, 30
-                          - 42, 96
-                        line_color: 0x223344
-                        line_width: 1
-                    - line:
-                        id: lvgl_co2_history_line_green
-                        hidden: true
-                        points:
-                          - 42, 96
-                          - 70, 96
-                          - 98, 96
-                          - 126, 96
-                          - 154, 96
-                          - 182, 96
-                          - 210, 96
-                          - 238, 96
-                          - 266, 96
-                          - 292, 96
-                        line_color: 0x2DD36F
-                        line_width: 3
-                        line_rounded: true
-                    - line:
-                        id: lvgl_co2_history_line_yellow
-                        points:
-                          - 42, 96
-                          - 70, 96
-                          - 98, 96
-                          - 126, 96
-                          - 154, 96
-                          - 182, 96
-                          - 210, 96
-                          - 238, 96
-                          - 266, 96
-                          - 292, 96
-                        line_color: 0xF8D64E
-                        line_width: 3
-                        line_rounded: true
-                    - line:
-                        id: lvgl_co2_history_line_orange
-                        hidden: true
-                        points:
-                          - 42, 96
-                          - 70, 96
-                          - 98, 96
-                          - 126, 96
-                          - 154, 96
-                          - 182, 96
-                          - 210, 96
-                          - 238, 96
-                          - 266, 96
-                          - 292, 96
-                        line_color: 0xFF8C1A
-                        line_width: 3
-                        line_rounded: true
-                    - line:
-                        id: lvgl_co2_history_line_red
-                        hidden: true
-                        points:
-                          - 42, 96
-                          - 70, 96
-                          - 98, 96
-                          - 126, 96
-                          - 154, 96
-                          - 182, 96
-                          - 210, 96
-                          - 238, 96
-                          - 266, 96
-                          - 292, 96
-                        line_color: 0xFF4D4D
-                        line_width: 3
-                        line_rounded: true
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "T:"
+              - label:
+                  id: lvgl_temperature_value
+                  x: 0
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(my_temperature).state' ]
+                    if_nan: "--"
+              - label:
+                  x: 115
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "H:"
+              - label:
+                  id: lvgl_humidity_value
+                  x: 107
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.1f"
+                    args: [ 'id(my_humidity).state' ]
+                    if_nan: "--"
+              - label:
+                  x: 221
+                  y: 128
+                  text_font: font16
+                  text_color: 0xFFFFFF
+                  text: "P:"
+              - label:
+                  id: lvgl_pressure_value
+                  x: 213
+                  y: 168
+                  width: 106
+                  text_align: CENTER
+                  text_font: font32
+                  text_color: 0xFFFFFF
+                  text:
+                    format: "%.0f"
+                    args: [ 'id(my_pressure).state' ]
+                    if_nan: "--"
 
   top_layer:
     widgets:
