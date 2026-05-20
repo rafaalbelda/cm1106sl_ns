@@ -345,14 +345,14 @@ sensor:
     uart_id: uart_pm
     type: PMSX003
     
-    # pm_1_0_std:
-    #   name: "PM1.0 std"
+    pm_1_0_std:
+      name: "PM1.0 std"
 
-    # pm_2_5_std:
-    #   name: "PM2.5 std"
+    pm_2_5_std:
+      name: "PM2.5 std"
 
-    # pm_10_0_std:
-    #   name: "PM10.0 std"
+    pm_10_0_std:
+      name: "PM10.0 std"
 
     pm_1_0:
       name: "PM1.0"
@@ -387,7 +387,7 @@ sensor:
                 format: "%.0f"
                 args: [ 'x' ]
                 if_nan: "--"
-    update_interval: 60s  # Synchronized with other sensors
+    update_interval: 30s  # Synchronized with other sensors
 
   - platform: aqi
     name: "European Air Quality Index"
@@ -697,18 +697,8 @@ binary_sensor:
         number: GPIO14
         mode: INPUT_PULLUP
         inverted: true
-    name: "Cambio Pantalla"
+    name: "Button"
     id: toggle_display
-    on_press:
-      then:
-      - display.page.show_next: my_display
-      - lvgl.page.next:
-          animation: OUT_LEFT
-          time: 300ms
-
-button:
-  - platform: template
-    name: "Botón"
     on_press:
       then:
       - display.page.show_next: my_display
@@ -2167,11 +2157,8 @@ display:
     ## rotated 90
     transform:
       swap_xy: true
-      mirror_x: false
-      mirror_y: false
-      # 180 degrees
-      # mirror_x: true
-      # mirror_y: true
+      mirror_x: true
+      mirror_y: true
     dimensions:
       height: 240
       width: 320
