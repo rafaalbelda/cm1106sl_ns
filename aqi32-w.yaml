@@ -539,6 +539,8 @@ sensor:
     temperature:
       name: "Temperatura"
       id: my_temperature
+      filters:
+        - lambda: return x + id(temperature_offset).state;
       on_value:
         then:
           - lvgl.label.update:
@@ -1074,6 +1076,19 @@ button:
       - lvgl.page.next:
           animation: OUT_LEFT
           time: 300ms
+
+number:
+  - platform: template
+    name: "Offset temperatura"
+    id: temperature_offset
+    optimistic: true
+    restore_value: true
+    initial_value: -5.0
+    min_value: -20.0
+    max_value: 20.0
+    step: 0.1
+    unit_of_measurement: "°C"
+    mode: box
 
 # Define a PWM output on the ESP32
 output:
