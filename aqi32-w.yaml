@@ -87,6 +87,10 @@ globals:
     type: float[10]
     restore_value: false
     initial_value: '{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}'
+  - id: active_weather_provider
+    type: int
+    restore_value: false
+    initial_value: '0'
 
 spi:
   - id: spi_bus
@@ -952,60 +956,80 @@ sensor:
     attribute: temperature
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_temp_p4
-            text:
-              format: "%.1f°C"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_temp_p4
+                  text:
+                    format: "%.1f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
   - platform: homeassistant
     id: ha_weather_apparent_temperature
     entity_id: sensor.aemet_temperature_feeling
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_feels_p4
-            text:
-              format: "%.0f°C"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_feels_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
   - platform: homeassistant
     id: ha_weather_temperature_high
     entity_id: sensor.aemet_daily_forecast_temperature
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_max_p4
-            text:
-              format: "%.0f°C"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_max_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
   - platform: homeassistant
     id: ha_weather_temperature_low
     entity_id: sensor.aemet_daily_forecast_temperature_low
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_min_p4
-            text:
-              format: "%.0f°C"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_min_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
   - platform: homeassistant
     id: ha_weather_precipitation_probability
     entity_id: sensor.aemet_daily_forecast_precipitation_probability
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_rain_p4
-            text:
-              format: "%.0f%%"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_rain_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
   - platform: homeassistant
     id: ha_weather_humidity
@@ -1013,12 +1037,66 @@ sensor:
     attribute: humidity
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_humidity_p4
-            text:
-              format: "%.0f%%"
-              args: [ 'x' ]
-              if_nan: "--"
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 1;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_humidity_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'x' ]
+                    if_nan: "--"
+
+  - platform: homeassistant
+    id: ha_weather_openweathermap_temperature
+    entity_id: weather.openweathermap
+    attribute: temperature
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 2;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_temp_p4
+                  text:
+                    format: "%.1f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
+
+  - platform: homeassistant
+    id: ha_weather_openweathermap_apparent_temperature
+    entity_id: sensor.openweathermap_temperatura_aparente
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 2;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_feels_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'x' ]
+                    if_nan: "--"
+
+  - platform: homeassistant
+    id: ha_weather_openweathermap_humidity
+    entity_id: weather.openweathermap
+    attribute: humidity
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) == 2;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_humidity_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'x' ]
+                    if_nan: "--"
 
 text_sensor:
   - platform: homeassistant
@@ -1026,33 +1104,233 @@ text_sensor:
     entity_id: weather.aemet
     on_value:
       then:
-        - lvgl.label.update:
-            id: lvgl_weather_condition_p4
-            text: !lambda |-
-              if (x == "sunny") return "Soleado";
-              if (x == "partlycloudy") return "Intervalos";
-              if (x == "cloudy") return "Nublado";
-              if (x == "rainy") return "Lluvia";
-              if (x == "pouring") return "Lluvia fuerte";
-              if (x == "lightning" || x == "lightning-rainy") return "Tormenta";
-              if (x == "snowy") return "Nieve";
-              if (x == "fog") return "Niebla";
-              if (x == "windy" || x == "windy-variant") return "Viento";
-              if (x == "clear-night") return "Despejado";
-              return x.c_str();
-        - lvgl.label.update:
-            id: lvgl_weather_icon_p4
-            text: !lambda |-
-              if (x == "sunny" || x == "clear-night") return "\U000F0599";
-              if (x == "partlycloudy") return "\U000F0595";
-              if (x == "cloudy") return "\U000F0590";
-              if (x == "rainy") return "\U000F0597";
-              if (x == "pouring") return "\U000F0596";
-              if (x == "lightning" || x == "lightning-rainy") return "\U000F0593";
-              if (x == "snowy") return "\U000F0598";
-              if (x == "fog") return "\U000F0591";
-              if (x == "windy" || x == "windy-variant") return "\U000F059D";
-              return "\U000F0595";
+        - if:
+            condition:
+              lambda: |-
+                return x.empty() || x == "unknown" || x == "unavailable";
+            then:
+              - if:
+                  condition:
+                    lambda: |-
+                      return !id(ha_weather_openweathermap_condition).state.empty()
+                        && id(ha_weather_openweathermap_condition).state != "unknown"
+                        && id(ha_weather_openweathermap_condition).state != "unavailable";
+                  then:
+                    - globals.set:
+                        id: active_weather_provider
+                        value: '2'
+                    - lvgl.label.update:
+                        id: lvgl_weather_provider_p4
+                        text: "OpenWeather"
+                    - lvgl.widget.show: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
+                    - lvgl.widget.hide: [lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4]
+                    - lvgl.label.update:
+                        id: lvgl_weather_temp_p4
+                        text:
+                          format: "%.1f°C"
+                          args: [ 'id(ha_weather_openweathermap_temperature).state' ]
+                          if_nan: "--"
+                    - lvgl.label.update:
+                        id: lvgl_weather_feels_p4
+                        text:
+                          format: "%.0f°C"
+                          args: [ 'id(ha_weather_openweathermap_apparent_temperature).state' ]
+                          if_nan: "--"
+                    - lvgl.label.update:
+                        id: lvgl_weather_humidity_p4
+                        text:
+                          format: "%.0f%%"
+                          args: [ 'id(ha_weather_openweathermap_humidity).state' ]
+                          if_nan: "--"
+                    - lvgl.label.update:
+                        id: lvgl_weather_condition_p4
+                        text: !lambda |-
+                          auto condition = id(ha_weather_openweathermap_condition).state;
+                          if (condition == "sunny") return std::string("Soleado");
+                          if (condition == "partlycloudy") return std::string("Intervalos");
+                          if (condition == "cloudy") return std::string("Nublado");
+                          if (condition == "rainy") return std::string("Lluvia");
+                          if (condition == "pouring") return std::string("Lluvia fuerte");
+                          if (condition == "lightning" || condition == "lightning-rainy") return std::string("Tormenta");
+                          if (condition == "snowy") return std::string("Nieve");
+                          if (condition == "fog") return std::string("Niebla");
+                          if (condition == "windy" || condition == "windy-variant") return std::string("Viento");
+                          if (condition == "clear-night") return std::string("Despejado");
+                          return condition;
+                    - lvgl.label.update:
+                        id: lvgl_weather_icon_p4
+                        text: !lambda |-
+                          auto condition = id(ha_weather_openweathermap_condition).state;
+                          if (condition == "sunny" || condition == "clear-night") return "\U000F0599";
+                          if (condition == "partlycloudy") return "\U000F0595";
+                          if (condition == "cloudy") return "\U000F0590";
+                          if (condition == "rainy") return "\U000F0597";
+                          if (condition == "pouring") return "\U000F0596";
+                          if (condition == "lightning" || condition == "lightning-rainy") return "\U000F0593";
+                          if (condition == "snowy") return "\U000F0598";
+                          if (condition == "fog") return "\U000F0591";
+                          if (condition == "windy" || condition == "windy-variant") return "\U000F059D";
+                          return "\U000F0595";
+                  else:
+                    - globals.set:
+                        id: active_weather_provider
+                        value: '0'
+                    - lvgl.label.update:
+                        id: lvgl_weather_provider_p4
+                        text: "Tiempo"
+                    - lvgl.widget.hide: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
+            else:
+              - globals.set:
+                  id: active_weather_provider
+                  value: '1'
+              - lvgl.label.update:
+                  id: lvgl_weather_provider_p4
+                  text: "AEMET"
+              - lvgl.widget.show: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
+              - lvgl.label.update:
+                  id: lvgl_weather_temp_p4
+                  text:
+                    format: "%.1f°C"
+                    args: [ 'id(ha_weather_temperature).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_feels_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'id(ha_weather_apparent_temperature).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_max_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'id(ha_weather_temperature_high).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_min_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'id(ha_weather_temperature_low).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_rain_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'id(ha_weather_precipitation_probability).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_humidity_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'id(ha_weather_humidity).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_condition_p4
+                  text: !lambda |-
+                    if (x == "sunny") return "Soleado";
+                    if (x == "partlycloudy") return "Intervalos";
+                    if (x == "cloudy") return "Nublado";
+                    if (x == "rainy") return "Lluvia";
+                    if (x == "pouring") return "Lluvia fuerte";
+                    if (x == "lightning" || x == "lightning-rainy") return "Tormenta";
+                    if (x == "snowy") return "Nieve";
+                    if (x == "fog") return "Niebla";
+                    if (x == "windy" || x == "windy-variant") return "Viento";
+                    if (x == "clear-night") return "Despejado";
+                    return x.c_str();
+              - lvgl.label.update:
+                  id: lvgl_weather_icon_p4
+                  text: !lambda |-
+                    if (x == "sunny" || x == "clear-night") return "\U000F0599";
+                    if (x == "partlycloudy") return "\U000F0595";
+                    if (x == "cloudy") return "\U000F0590";
+                    if (x == "rainy") return "\U000F0597";
+                    if (x == "pouring") return "\U000F0596";
+                    if (x == "lightning" || x == "lightning-rainy") return "\U000F0593";
+                    if (x == "snowy") return "\U000F0598";
+                    if (x == "fog") return "\U000F0591";
+                    if (x == "windy" || x == "windy-variant") return "\U000F059D";
+                    return "\U000F0595";
+
+  - platform: homeassistant
+    id: ha_weather_openweathermap_condition
+    entity_id: weather.openweathermap
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                return (id(ha_weather_condition).state.empty()
+                  || id(ha_weather_condition).state == "unknown"
+                  || id(ha_weather_condition).state == "unavailable")
+                  && !x.empty() && x != "unknown" && x != "unavailable";
+            then:
+              - globals.set:
+                  id: active_weather_provider
+                  value: '2'
+              - lvgl.label.update:
+                  id: lvgl_weather_provider_p4
+                  text: "OpenWeather"
+              - lvgl.widget.show: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
+              - lvgl.widget.hide: [lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4]
+              - lvgl.label.update:
+                  id: lvgl_weather_temp_p4
+                  text:
+                    format: "%.1f°C"
+                    args: [ 'id(ha_weather_openweathermap_temperature).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_feels_p4
+                  text:
+                    format: "%.0f°C"
+                    args: [ 'id(ha_weather_openweathermap_apparent_temperature).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_humidity_p4
+                  text:
+                    format: "%.0f%%"
+                    args: [ 'id(ha_weather_openweathermap_humidity).state' ]
+                    if_nan: "--"
+              - lvgl.label.update:
+                  id: lvgl_weather_condition_p4
+                  text: !lambda |-
+                    if (x == "sunny") return "Soleado";
+                    if (x == "partlycloudy") return "Intervalos";
+                    if (x == "cloudy") return "Nublado";
+                    if (x == "rainy") return "Lluvia";
+                    if (x == "pouring") return "Lluvia fuerte";
+                    if (x == "lightning" || x == "lightning-rainy") return "Tormenta";
+                    if (x == "snowy") return "Nieve";
+                    if (x == "fog") return "Niebla";
+                    if (x == "windy" || x == "windy-variant") return "Viento";
+                    if (x == "clear-night") return "Despejado";
+                    return x.c_str();
+              - lvgl.label.update:
+                  id: lvgl_weather_icon_p4
+                  text: !lambda |-
+                    if (x == "sunny" || x == "clear-night") return "\U000F0599";
+                    if (x == "partlycloudy") return "\U000F0595";
+                    if (x == "cloudy") return "\U000F0590";
+                    if (x == "rainy") return "\U000F0597";
+                    if (x == "pouring") return "\U000F0596";
+                    if (x == "lightning" || x == "lightning-rainy") return "\U000F0593";
+                    if (x == "snowy") return "\U000F0598";
+                    if (x == "fog") return "\U000F0591";
+                    if (x == "windy" || x == "windy-variant") return "\U000F059D";
+                    return "\U000F0595";
+            else:
+              - if:
+                  condition:
+                    lambda: |-
+                      return id(active_weather_provider) == 2
+                        && (x.empty() || x == "unknown" || x == "unavailable");
+                  then:
+                    - globals.set:
+                        id: active_weather_provider
+                        value: '0'
+                    - lvgl.label.update:
+                        id: lvgl_weather_provider_p4
+                        text: "Tiempo"
+                    - lvgl.widget.hide: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
 
 binary_sensor:
   - platform: gpio
@@ -3268,11 +3546,12 @@ lvgl:
                   pad_all: 0
                   widgets:
                     - label:
+                        id: lvgl_weather_provider_p4
                         x: 12
                         y: 8
                         text_font: font16
                         text_color: 0x8FC8FF
-                        text: "AEMET"
+                        text: "Tiempo"
                     - label:
                         x: 260
                         y: 10
@@ -3283,6 +3562,7 @@ lvgl:
                         text: "Hoy"
                     - label:
                         id: lvgl_weather_icon_p4
+                        hidden: true
                         x: 22
                         y: 36
                         width: 70
@@ -3292,6 +3572,7 @@ lvgl:
                         text: "\U000F0595"
                     - label:
                         id: lvgl_weather_temp_p4
+                        hidden: true
                         x: 104
                         y: 28
                         width: 102
@@ -3304,6 +3585,7 @@ lvgl:
                           if_nan: "--"
                     - label:
                         id: lvgl_weather_condition_p4
+                        hidden: true
                         x: 214
                         y: 38
                         width: 78
@@ -3312,6 +3594,8 @@ lvgl:
                         text_color: 0xF8D64E
                         text: "--"
                     - label:
+                        id: lvgl_weather_feels_title_p4
+                        hidden: true
                         x: 120
                         y: 68
                         text_font: font10
@@ -3319,6 +3603,7 @@ lvgl:
                         text: "Sensacion"
                     - label:
                         id: lvgl_weather_feels_p4
+                        hidden: true
                         x: 174
                         y: 68
                         width: 32
@@ -3330,6 +3615,8 @@ lvgl:
                           args: [ 'id(ha_weather_apparent_temperature).state' ]
                           if_nan: "--"
                     - label:
+                        id: lvgl_weather_max_title_p4
+                        hidden: true
                         x: 18
                         y: 102
                         text_font: font10
@@ -3337,6 +3624,7 @@ lvgl:
                         text: "Max"
                     - label:
                         id: lvgl_weather_max_p4
+                        hidden: true
                         x: 84
                         y: 102
                         width: 42
@@ -3348,6 +3636,8 @@ lvgl:
                           args: [ 'id(ha_weather_temperature_high).state' ]
                           if_nan: "--"
                     - label:
+                        id: lvgl_weather_min_title_p4
+                        hidden: true
                         x: 18
                         y: 124
                         text_font: font10
@@ -3355,6 +3645,7 @@ lvgl:
                         text: "Min"
                     - label:
                         id: lvgl_weather_min_p4
+                        hidden: true
                         x: 84
                         y: 124
                         width: 42
@@ -3366,6 +3657,8 @@ lvgl:
                           args: [ 'id(ha_weather_temperature_low).state' ]
                           if_nan: "--"
                     - label:
+                        id: lvgl_weather_rain_title_p4
+                        hidden: true
                         x: 160
                         y: 102
                         text_font: font10
@@ -3373,6 +3666,7 @@ lvgl:
                         text: "Lluvia"
                     - label:
                         id: lvgl_weather_rain_p4
+                        hidden: true
                         x: 248
                         y: 102
                         width: 42
@@ -3384,6 +3678,8 @@ lvgl:
                           args: [ 'id(ha_weather_precipitation_probability).state' ]
                           if_nan: "--"
                     - label:
+                        id: lvgl_weather_humidity_title_p4
+                        hidden: true
                         x: 160
                         y: 124
                         text_font: font10
@@ -3391,6 +3687,7 @@ lvgl:
                         text: "Humedad"
                     - label:
                         id: lvgl_weather_humidity_p4
+                        hidden: true
                         x: 248
                         y: 124
                         width: 42
