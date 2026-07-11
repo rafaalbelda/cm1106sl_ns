@@ -1342,18 +1342,100 @@ binary_sensor:
     id: toggle_display
     on_press:
       then:
-      - lvgl.page.next:
-          animation: OUT_LEFT
-          time: 300ms
+      - select.next:
+          id: display_page
+          cycle: true
 
 button:
   - platform: template
     name: "Botón"
     on_press:
       then:
-      - lvgl.page.next:
-          animation: OUT_LEFT
-          time: 300ms
+      - select.next:
+          id: display_page
+          cycle: true
+
+select:
+  - platform: template
+    name: "Página de pantalla"
+    id: display_page
+    icon: "mdi:view-dashboard"
+    optimistic: true
+    initial_option: "Calidad del aire"
+    options:
+      - "Calidad del aire"
+      - "Resumen"
+      - "Ventilación"
+      - "Partículas"
+      - "CO2"
+      - "VOC y NOx"
+      - "Comparación AQI"
+      - "Tiempo"
+    set_action:
+      - if:
+          condition:
+            lambda: 'return x == "Calidad del aire";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page1
+                animation: OUT_RIGHT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Resumen";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_overview
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Ventilación";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_rows
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Partículas";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page2
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "CO2";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page3
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "VOC y NOx";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page4
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Comparación AQI";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_aqi_compare
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Tiempo";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page5
+                animation: OUT_LEFT
+                time: 300ms
 
 number:
   - platform: template
@@ -3601,18 +3683,18 @@ lvgl:
                         id: lvgl_weather_feels_title_p4
                         hidden: true
                         x: 90
-                        y: 109
+                        y: 116
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Sensacion"
                     - label:
                         id: lvgl_weather_feels_p4
                         hidden: true
-                        x: 131
-                        y: 109
-                        width: 24
+                        x: 155
+                        y: 113
+                        width: 50
                         text_align: RIGHT
-                        text_font: font10
+                        text_font: font16
                         text_color: 0xFFFFFF
                         text:
                           format: "%.0f°C"
@@ -3622,18 +3704,18 @@ lvgl:
                         id: lvgl_weather_max_title_p4
                         hidden: true
                         x: 14
-                        y: 136
+                        y: 143
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Max"
                     - label:
                         id: lvgl_weather_max_p4
                         hidden: true
-                        x: 63
-                        y: 136
-                        width: 32
+                        x: 55
+                        y: 140
+                        width: 40
                         text_align: RIGHT
-                        text_font: font10
+                        text_font: font16
                         text_color: 0xFFFFFF
                         text:
                           format: "%.0f°C"
@@ -3643,18 +3725,18 @@ lvgl:
                         id: lvgl_weather_min_title_p4
                         hidden: true
                         x: 14
-                        y: 165
+                        y: 172
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Min"
                     - label:
                         id: lvgl_weather_min_p4
                         hidden: true
-                        x: 63
-                        y: 165
-                        width: 32
+                        x: 55
+                        y: 169
+                        width: 40
                         text_align: RIGHT
-                        text_font: font10
+                        text_font: font16
                         text_color: 0xFFFFFF
                         text:
                           format: "%.0f°C"
@@ -3664,18 +3746,18 @@ lvgl:
                         id: lvgl_weather_rain_title_p4
                         hidden: true
                         x: 120
-                        y: 136
+                        y: 143
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Lluvia"
                     - label:
                         id: lvgl_weather_rain_p4
                         hidden: true
-                        x: 186
-                        y: 136
-                        width: 32
+                        x: 178
+                        y: 140
+                        width: 40
                         text_align: RIGHT
-                        text_font: font10
+                        text_font: font16
                         text_color: 0xFFFFFF
                         text:
                           format: "%.0f%%"
@@ -3685,18 +3767,18 @@ lvgl:
                         id: lvgl_weather_humidity_title_p4
                         hidden: true
                         x: 120
-                        y: 165
+                        y: 172
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Humedad"
                     - label:
                         id: lvgl_weather_humidity_p4
                         hidden: true
-                        x: 186
-                        y: 165
-                        width: 32
+                        x: 178
+                        y: 169
+                        width: 40
                         text_align: RIGHT
-                        text_font: font10
+                        text_font: font16
                         text_color: 0xFFFFFF
                         text:
                           format: "%.0f%%"

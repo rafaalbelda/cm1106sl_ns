@@ -1342,18 +1342,100 @@ binary_sensor:
     id: toggle_display
     on_press:
       then:
-      - lvgl.page.next:
-          animation: OUT_LEFT
-          time: 300ms
+      - select.next:
+          id: display_page
+          cycle: true
 
 button:
   - platform: template
     name: "Botón"
     on_press:
       then:
-      - lvgl.page.next:
-          animation: OUT_LEFT
-          time: 300ms
+      - select.next:
+          id: display_page
+          cycle: true
+
+select:
+  - platform: template
+    name: "Página de pantalla"
+    id: display_page
+    icon: "mdi:view-dashboard"
+    optimistic: true
+    initial_option: "Calidad del aire"
+    options:
+      - "Calidad del aire"
+      - "Resumen"
+      - "Ventilación"
+      - "Partículas"
+      - "CO2"
+      - "VOC y NOx"
+      - "Comparación AQI"
+      - "Tiempo"
+    set_action:
+      - if:
+          condition:
+            lambda: 'return x == "Calidad del aire";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page1
+                animation: OUT_RIGHT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Resumen";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_overview
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Ventilación";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_rows
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Partículas";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page2
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "CO2";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page3
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "VOC y NOx";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page4
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Comparación AQI";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page_aqi_compare
+                animation: OUT_LEFT
+                time: 300ms
+      - if:
+          condition:
+            lambda: 'return x == "Tiempo";'
+          then:
+            - lvgl.page.show:
+                id: lvgl_page5
+                animation: OUT_LEFT
+                time: 300ms
 
 number:
   - platform: template
