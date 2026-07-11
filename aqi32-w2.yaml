@@ -18,11 +18,11 @@ logger:
 
 api:
   encryption:
-    key: "Fwy7bN2zDEjkCnrFapHhqnEElSg573EZ0Y8NO549x6A="
+    key: !secret airq32_w2_api_encryption_key
 
 ota:
   - platform: esphome
-    password: "b1aea7cd2f9fe0b199583633ee38d4fd"
+    password: !secret airq32_w2_ota_password
 
 wifi:
   ssid: !secret wifi_ssid
@@ -30,7 +30,7 @@ wifi:
 
   ap:
     ssid: "Airq32-W2 Fallback Hotspot"
-    password: "PTi8ZbbmVD57"
+    password: !secret airq32_w2_fallback_password
 
 captive_portal:
 

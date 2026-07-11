@@ -18,11 +18,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "yEC5Exm6Xd23z9nawIiouA4v9oj4NG5uIcx/c9htlNo="
+    key: !secret airq32_api_encryption_key
 
 ota:
   - platform: esphome
-    password: "df70e3845fd37c0c3a82554e1f9a9974"
+    password: !secret airq32_ota_password
 
 wifi:
   ssid: !secret wifi_ssid
@@ -32,7 +32,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Airq32 Fallback Hotspot"
-    password: "fQIAdJyW9zVY"
+    password: !secret airq32_fallback_password
 
 captive_portal:
 

@@ -28,7 +28,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "Fwy7bN2zDEjkCnrFapHhqnEElSg573EZ0Y8NO549x6A="
+    key: !secret airq32_w2_api_encryption_key
 
   # on_client_connected:
   #   - wait_until:
@@ -45,7 +45,7 @@ api:
 
 ota:
   - platform: esphome
-    password: "b1aea7cd2f9fe0b199583633ee38d4fd"
+    password: !secret airq32_w2_ota_password
 
 wifi:
   ssid: !secret wifi_ssid
@@ -54,7 +54,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Airq32-W2 Fallback Hotspot"
-    password: "PTi8ZbbmVD57"
+    password: !secret airq32_w2_fallback_password
 
 captive_portal:
 
@@ -410,4 +410,3 @@ display:
             it.print(2*w/3+2, h/2+2, id(font10), display::TextAlign::LEFT, "P:");
             it.printf(5*w/6, 3*h/4+4, id(font16), display::TextAlign::CENTER, "%.0f", id(my_pressure).state);
 
-    

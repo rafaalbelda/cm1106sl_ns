@@ -3,7 +3,7 @@ esphome:
   friendly_name: AirQ32-W
   on_boot:
     - delay: 5s
-    - lvgl.widget.hide: boot_screen  
+    - lvgl.widget.hide: boot_screen
 
 external_components:
   #- source: github://rafaalbelda/cm1106sl_ns@i2c
@@ -15,7 +15,7 @@ external_components:
 #       url: https://github.com/rafaalbelda/cm1106sl_ns
 #       ref: 44633e2c3778459598545e45e99cbe86a7a98294
 #     components: [ cm1106sl_ns ]
-#     refresh: 
+#     refresh:
 
 esp32:
   board: az-delivery-devkit-v4
@@ -575,7 +575,7 @@ sensor:
                 format: "%.1f"
                 args: [ 'x' ]
                 if_nan: "--"
-    update_interval: 60s  # Synchronized with CO2 sensor 
+    update_interval: 60s  # Synchronized with CO2 sensor
 
   - platform: absolute_humidity
     name: Absolute Humidity
@@ -585,7 +585,7 @@ sensor:
   - platform: pmsx003
     uart_id: uart_pm
     type: PMSX003
-    
+
     # pm_1_0_std:
     #   name: "PM1.0 std"
 
@@ -1334,7 +1334,7 @@ text_sensor:
 
 binary_sensor:
   - platform: gpio
-    pin: 
+    pin:
         number: GPIO14
         mode: INPUT_PULLUP
         inverted: true
@@ -3836,7 +3836,7 @@ lvgl:
       #     y: 7
       #     text_align: right
       #     text_color: 0xFFFFFF
-        
+
       # make sure it's the last one in this list:
       - obj:
           id: boot_screen
@@ -3872,7 +3872,7 @@ lvgl:
 display:
 #   - platform: ili9xxx
 #     model: ili9342
-#     cs_pin: 4 
+#     cs_pin: 4
 #     dc_pin: 2
 #     reset_pin: 0
 #     invert_colors: true
@@ -3883,7 +3883,7 @@ display:
   - platform: ili9xxx
     id: my_display1
     model: ili9342
-    cs_pin: 4 
+    cs_pin: 4
     dc_pin: 2
     reset_pin: 0
     color_palette: 8BIT
