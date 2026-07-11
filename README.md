@@ -166,6 +166,90 @@ desde el ESP32. En ese servidor deben publicarse los dos archivos
 `firmware.ota.bin` generados al compilar las configuraciones y sus archivos MD5.
 Se debe utilizar el binario OTA, no `firmware.factory.bin`.
 
+#### Generar los BIN y MD5
+
+Como las dos configuraciones utilizan el mismo nombre de dispositivo,
+`airq32-w`, ESPHome escribe sus resultados en el mismo directorio. Por eso hay
+que copiar y renombrar el BIN horizontal antes de compilar el vertical.
+
+Desde PowerShell, situado en el directorio del repositorio:
+
+```powershell
+esphome compile aqi32-w.yaml
+
+Copy-Item `
+  ".esphome/build/airq32-w/.pioenvs/airq32-w/firmware.ota.bin" `
+  "firmware-horizontal.ota.bin"
+
+esphome compile aqi32-w-vertical.yaml
+
+Copy-Item `
+  ".esphome/build/airq32-w/.pioenvs/airq32-w/firmware.ota.bin" `
+  "firmware-vertical.ota.bin"
+```
+
+A continuación se generan los archivos de comprobación MD5:
+
+```powershell
+(Get-FileHash "firmware-horizontal.ota.bin" -Algorithm MD5).Hash.ToLower() |
+  Out-File "firmware-horizontal.md5" -Encoding ASCII
+
+(Get-FileHash "firmware-vertical.ota.bin" -Algorithm MD5).Hash.ToLower() |
+  Out-File "firmware-vertical.md5" -Encoding ASCII
+```
+
+El resultado son los cuatro archivos que deben publicarse en el servidor:
+
+```text
+firmware-horizontal.ota.bin
+firmware-horizontal.md5
+firmware-vertical.ota.bin
+firmware-vertical.md5
+```
+
+El archivo MD5 debe contener únicamente los 32 caracteres hexadecimales en
+minúsculas correspondientes al BIN asociado.
+
+También se pueden compilar desde el panel de ESPHome. Para cada configuración se
+selecciona `Install`, descarga manual y formato **OTA** (anteriormente llamado
+**Legacy**). Después se renombra el archivo descargado y se genera su MD5 con los
+comandos anteriores. El formato **Factory** no sirve para esta actualización.
+
+#### Alojar los firmwares en Home Assistant
+
+Home Assistant puede actuar como servidor de los archivos. Se pueden guardar en
+un subdirectorio de `/config/www/`, por ejemplo:
+
+```text
+/config/www/firmware/firmware-horizontal.ota.bin
+/config/www/firmware/firmware-horizontal.md5
+/config/www/firmware/firmware-vertical.ota.bin
+/config/www/firmware/firmware-vertical.md5
+```
+
+El contenido de `/config/www/` se publica mediante la ruta `/local/`. Si la IP
+local de Home Assistant es `192.168.1.250`, las acciones quedarían así:
+
+```yaml
+- ota.http_request.flash:
+    url: http://192.168.1.250:8123/local/firmware/firmware-horizontal.ota.bin
+    md5_url: http://192.168.1.250:8123/local/firmware/firmware-horizontal.md5
+
+- ota.http_request.flash:
+    url: http://192.168.1.250:8123/local/firmware/firmware-vertical.ota.bin
+    md5_url: http://192.168.1.250:8123/local/firmware/firmware-vertical.md5
+```
+
+La dirección debe ser accesible directamente desde el ESP32. Conviene comprobar
+las URL desde otro equipo de la misma red antes de actualizar. La ruta `/local/`
+no debe utilizarse para guardar secretos, ya que sus archivos se sirven sin la
+autenticación habitual de Home Assistant. Si se acaba de crear `/config/www/`,
+puede ser necesario reiniciar Home Assistant.
+
+Cuando Home Assistant utiliza HTTPS con un certificado que el ESP32 no reconoce,
+la descarga puede fallar. En una red local aislada suele ser más sencillo usar
+la dirección HTTP local de Home Assistant.
+
 Una vez instalado cualquiera de los dos firmwares, Home Assistant mostrará los
 dos botones. Al pulsar uno, el ESP32 descargará el binario correspondiente, lo
 instalará y se reiniciará con la nueva orientación. Es recomendable colocar los
