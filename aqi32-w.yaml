@@ -3,7 +3,22 @@ esphome:
   friendly_name: AirQ32-W
   on_boot:
     - delay: 5s
-    - lvgl.widget.hide: boot_screen  
+    - lvgl.widget.hide: boot_screen
+    - if:
+        condition:
+          wifi.connected:
+        then:
+          - lvgl.label.update:
+              id: lbl_wifi_status
+              text_color: 0x2DD36F
+    - if:
+        condition:
+          api.connected:
+            state_subscription_only: true
+        then:
+          - lvgl.label.update:
+              id: lbl_ha_status
+              text_color: 0x2DD36F
 
 external_components:
   #- source: github://rafaalbelda/cm1106sl_ns@i2c
@@ -30,19 +45,25 @@ logger:
 api:
   encryption:
     key: !secret airq32_w_api_encryption_key
+  # Evita reinicios periódicos cuando Home Assistant no está conectado.
+  reboot_timeout: 0s
 
-  # on_client_connected:
-  #   - wait_until:
-  #       condition:
-  #         api.connected:
-  #           state_subscription_only: true
-  #   - lvgl.widget.show: lbl_hastatus
-  # on_client_disconnected:
-  #   - if:
-  #       condition:
-  #         lambda: 'return (0 == client_info.find("Home Assistant "));'
-  #       then:
-  #         - lvgl.widget.hide: lbl_hastatus
+  on_client_connected:
+    - wait_until:
+        condition:
+          api.connected:
+            state_subscription_only: true
+    - lvgl.label.update:
+        id: lbl_ha_status
+        text_color: 0x2DD36F
+  on_client_disconnected:
+    - if:
+        condition:
+          lambda: 'return (0 == client_info.find("Home Assistant "));'
+        then:
+          - lvgl.label.update:
+              id: lbl_ha_status
+              text_color: 0xFF5252
 
 ota:
   - platform: esphome
@@ -51,6 +72,16 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # Evita reinicios periódicos cuando no hay conexión a la red Wi-Fi.
+  reboot_timeout: 0s
+  on_connect:
+    - lvgl.label.update:
+        id: lbl_wifi_status
+        text_color: 0x2DD36F
+  on_disconnect:
+    - lvgl.label.update:
+        id: lbl_wifi_status
+        text_color: 0xFF5252
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
@@ -1501,6 +1532,14 @@ font:
       "\U000F059D", # mdi-weather-windy
       ]
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    id: mdi_status_14
+    size: 14
+    bpp: 4
+    glyphs: [
+      "\U000F05A9", # mdi-wifi
+      "\U000F07D0", # mdi-home-assistant
+      ]
+  - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: mdi_weather_48
     size: 48
     bpp: 4
@@ -1538,9 +1577,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -1550,9 +1589,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_card
                   x: 8
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 104
+                  height: 97
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -1563,9 +1602,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_icon_box
                         x: 8
-                        y: 8
+                        y: 7
                         width: 30
-                        height: 24
+                        height: 22
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -1582,14 +1621,14 @@ lvgl:
                     - label:
                         id: lvgl_aqi_title
                         x: 46
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "AQI"
                     - label:
                         id: lvgl_aqi_value_p1
                         x: 8
-                        y: 38
+                        y: 35
                         width: 132
                         text_align: CENTER
                         text_font: font32
@@ -1601,7 +1640,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_status
                         x: 0
-                        y: 82
+                        y: 77
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1610,9 +1649,9 @@ lvgl:
               - obj:
                   id: lvgl_co2_card
                   x: 164
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 104
+                  height: 97
                   bg_color: 0x2B2815
                   bg_opa: COVER
                   border_color: 0xF8D64E
@@ -1623,9 +1662,9 @@ lvgl:
                     - obj:
                         id: lvgl_co2_icon_box
                         x: 8
-                        y: 8
+                        y: 7
                         width: 30
-                        height: 24
+                        height: 22
                         bg_color: 0x3D3715
                         bg_opa: COVER
                         border_color: 0xF8D64E
@@ -1642,14 +1681,14 @@ lvgl:
                     - label:
                         id: lvgl_co2_title
                         x: 46
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0xF8D64E
                         text: "CO2"
                     - label:
                         id: lvgl_co2_value
                         x: 8
-                        y: 38
+                        y: 35
                         width: 132
                         text_align: CENTER
                         text_font: font32
@@ -1661,7 +1700,7 @@ lvgl:
                     - label:
                         id: lvgl_co2_status
                         x: 0
-                        y: 82
+                        y: 77
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1670,9 +1709,9 @@ lvgl:
               - obj:
                   id: lvgl_voc_card_p1
                   x: 8
-                  y: 128
+                  y: 119
                   width: 148
-                  height: 104
+                  height: 97
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -1683,9 +1722,9 @@ lvgl:
                     - obj:
                         id: lvgl_voc_icon_box_p1
                         x: 8
-                        y: 8
+                        y: 7
                         width: 30
-                        height: 24
+                        height: 22
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -1702,14 +1741,14 @@ lvgl:
                     - label:
                         id: lvgl_voc_title_p1
                         x: 46
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "VOC"
                     - label:
                         id: lvgl_voc_value_p1
                         x: 8
-                        y: 38
+                        y: 35
                         width: 132
                         text_align: CENTER
                         text_font: font32
@@ -1721,7 +1760,7 @@ lvgl:
                     - label:
                         id: lvgl_voc_status_p1
                         x: 0
-                        y: 82
+                        y: 77
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1730,9 +1769,9 @@ lvgl:
               - obj:
                   id: lvgl_nox_card_p1
                   x: 164
-                  y: 128
+                  y: 119
                   width: 148
-                  height: 104
+                  height: 97
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -1743,9 +1782,9 @@ lvgl:
                     - obj:
                         id: lvgl_nox_icon_box_p1
                         x: 8
-                        y: 8
+                        y: 7
                         width: 30
-                        height: 24
+                        height: 22
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -1762,14 +1801,14 @@ lvgl:
                     - label:
                         id: lvgl_nox_title_p1
                         x: 46
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "NOx"
                     - label:
                         id: lvgl_nox_value_p1
                         x: 8
-                        y: 38
+                        y: 35
                         width: 132
                         text_align: CENTER
                         text_font: font32
@@ -1781,7 +1820,7 @@ lvgl:
                     - label:
                         id: lvgl_nox_status_p1
                         x: 0
-                        y: 82
+                        y: 77
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1794,9 +1833,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -1806,9 +1845,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_card_p_overview
                   x: 8
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 112
+                  height: 105
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -1819,9 +1858,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_icon_box_p_overview
                         x: 8
-                        y: 8
+                        y: 7
                         width: 28
-                        height: 24
+                        height: 22
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -1838,14 +1877,14 @@ lvgl:
                     - label:
                         id: lvgl_aqi_title_p_overview
                         x: 42
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "AQI"
                     - label:
                         id: lvgl_aqi_value_p_overview
                         x: 8
-                        y: 42
+                        y: 39
                         width: 132
                         text_align: CENTER
                         text_font: font48
@@ -1857,7 +1896,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_status_p_overview
                         x: 0
-                        y: 94
+                        y: 88
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1866,9 +1905,9 @@ lvgl:
               - obj:
                   id: lvgl_co2_card_p_overview
                   x: 164
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 112
+                  height: 105
                   bg_color: 0x2B2815
                   bg_opa: COVER
                   border_color: 0xF8D64E
@@ -1879,9 +1918,9 @@ lvgl:
                     - obj:
                         id: lvgl_co2_icon_box_p_overview
                         x: 8
-                        y: 8
+                        y: 7
                         width: 32
-                        height: 24
+                        height: 22
                         bg_color: 0x3D3715
                         bg_opa: COVER
                         border_color: 0xF8D64E
@@ -1898,14 +1937,14 @@ lvgl:
                     - label:
                         id: lvgl_co2_title_p_overview
                         x: 46
-                        y: 10
+                        y: 9
                         text_font: font16
                         text_color: 0xF8D64E
                         text: "CO2"
                     - label:
                         id: lvgl_co2_value_p_overview
                         x: 8
-                        y: 42
+                        y: 39
                         width: 132
                         text_align: CENTER
                         text_font: font48
@@ -1917,7 +1956,7 @@ lvgl:
                     - label:
                         id: lvgl_co2_unit_p_overview
                         x: 0
-                        y: 94
+                        y: 88
                         width: 148
                         text_align: CENTER
                         text_font: font10
@@ -1925,9 +1964,9 @@ lvgl:
                         text: "ppm"
               - obj:
                   x: 8
-                  y: 128
+                  y: 119
                   width: 96
-                  height: 52
+                  height: 49
                   bg_color: 0x151E28
                   bg_opa: COVER
                   border_color: 0x26394A
@@ -1950,7 +1989,7 @@ lvgl:
                     - label:
                         id: lvgl_pm1_value_p_overview
                         x: 8
-                        y: 25
+                        y: 23
                         width: 80
                         text_align: CENTER
                         text_font: font16
@@ -1961,9 +2000,9 @@ lvgl:
                           if_nan: "--"
               - obj:
                   x: 112
-                  y: 128
+                  y: 119
                   width: 96
-                  height: 52
+                  height: 49
                   bg_color: 0x151E28
                   bg_opa: COVER
                   border_color: 0x26394A
@@ -1986,7 +2025,7 @@ lvgl:
                     - label:
                         id: lvgl_pm25_value_p_overview
                         x: 8
-                        y: 25
+                        y: 23
                         width: 80
                         text_align: CENTER
                         text_font: font16
@@ -1997,9 +2036,9 @@ lvgl:
                           if_nan: "--"
               - obj:
                   x: 216
-                  y: 128
+                  y: 119
                   width: 96
-                  height: 52
+                  height: 49
                   bg_color: 0x151E28
                   bg_opa: COVER
                   border_color: 0x26394A
@@ -2022,7 +2061,7 @@ lvgl:
                     - label:
                         id: lvgl_pm10_value_p_overview
                         x: 8
-                        y: 25
+                        y: 23
                         width: 80
                         text_align: CENTER
                         text_font: font16
@@ -2033,9 +2072,9 @@ lvgl:
                           if_nan: "--"
               - obj:
                   x: 8
-                  y: 188
+                  y: 175
                   width: 96
-                  height: 44
+                  height: 41
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -2058,7 +2097,7 @@ lvgl:
                     - label:
                         id: lvgl_temperature_value_p_overview
                         x: 8
-                        y: 22
+                        y: 21
                         width: 58
                         text_align: RIGHT
                         text_font: font16
@@ -2069,15 +2108,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 68
-                        y: 25
+                        y: 23
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "C"
               - obj:
                   x: 112
-                  y: 188
+                  y: 175
                   width: 96
-                  height: 44
+                  height: 41
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -2100,7 +2139,7 @@ lvgl:
                     - label:
                         id: lvgl_humidity_value_p_overview
                         x: 8
-                        y: 22
+                        y: 21
                         width: 58
                         text_align: RIGHT
                         text_font: font16
@@ -2111,15 +2150,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 68
-                        y: 25
+                        y: 23
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "%"
               - obj:
                   x: 216
-                  y: 188
+                  y: 175
                   width: 96
-                  height: 44
+                  height: 41
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -2142,7 +2181,7 @@ lvgl:
                     - label:
                         id: lvgl_pressure_value_p_overview
                         x: 6
-                        y: 22
+                        y: 21
                         width: 56
                         text_align: RIGHT
                         text_font: font16
@@ -2153,7 +2192,7 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 64
-                        y: 25
+                        y: 23
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "hPa"
@@ -2164,9 +2203,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -2176,9 +2215,9 @@ lvgl:
               - obj:
                   id: lvgl_ventilation_card
                   x: 8
-                  y: 8
+                  y: 7
                   width: 304
-                  height: 54
+                  height: 50
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -2189,7 +2228,7 @@ lvgl:
                     - label:
                         id: lvgl_ventilation_status
                         x: 0
-                        y: 8
+                        y: 7
                         width: 304
                         text_align: CENTER
                         text_font: font32
@@ -2197,7 +2236,7 @@ lvgl:
                         text: "NORMAL"
               - label:
                   x: 0
-                  y: 64
+                  y: 60
                   width: 320
                   text_align: CENTER
                   text_font: font10
@@ -2206,9 +2245,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_row_card
                   x: 8
-                  y: 82
+                  y: 77
                   width: 304
-                  height: 36
+                  height: 34
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -2219,7 +2258,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_title_rows
                         x: 12
-                        y: 8
+                        y: 7
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "AQI"
@@ -2238,7 +2277,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_status_rows
                         x: 194
-                        y: 8
+                        y: 7
                         width: 96
                         text_align: RIGHT
                         text_font: font10
@@ -2247,9 +2286,9 @@ lvgl:
               - obj:
                   id: lvgl_co2_row_card
                   x: 8
-                  y: 122
+                  y: 114
                   width: 304
-                  height: 36
+                  height: 34
                   bg_color: 0x2B2815
                   bg_opa: COVER
                   border_color: 0xF8D64E
@@ -2260,7 +2299,7 @@ lvgl:
                     - label:
                         id: lvgl_co2_title_rows
                         x: 12
-                        y: 8
+                        y: 7
                         text_font: font16
                         text_color: 0xF8D64E
                         text: "CO2"
@@ -2279,7 +2318,7 @@ lvgl:
                     - label:
                         id: lvgl_co2_status_rows
                         x: 194
-                        y: 8
+                        y: 7
                         width: 96
                         text_align: RIGHT
                         text_font: font10
@@ -2288,9 +2327,9 @@ lvgl:
               - obj:
                   id: lvgl_voc_row_card
                   x: 8
-                  y: 162
+                  y: 151
                   width: 304
-                  height: 36
+                  height: 34
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -2301,7 +2340,7 @@ lvgl:
                     - label:
                         id: lvgl_voc_title_rows
                         x: 12
-                        y: 8
+                        y: 7
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "VOC"
@@ -2320,7 +2359,7 @@ lvgl:
                     - label:
                         id: lvgl_voc_status_rows
                         x: 194
-                        y: 8
+                        y: 7
                         width: 96
                         text_align: RIGHT
                         text_font: font10
@@ -2329,9 +2368,9 @@ lvgl:
               - obj:
                   id: lvgl_nox_row_card
                   x: 8
-                  y: 202
+                  y: 189
                   width: 304
-                  height: 30
+                  height: 28
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -2374,9 +2413,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -2386,9 +2425,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_card_p2
                   x: 8
-                  y: 8
+                  y: 7
                   width: 304
-                  height: 86
+                  height: 80
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -2399,9 +2438,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_icon_box_p2
                         x: 10
-                        y: 10
+                        y: 9
                         width: 32
-                        height: 28
+                        height: 26
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -2418,14 +2457,14 @@ lvgl:
                     - label:
                         id: lvgl_aqi_title_p2
                         x: 50
-                        y: 11
+                        y: 10
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "AQI"
                     - label:
                         id: lvgl_aqi_value_p2
                         x: 118
-                        y: 10
+                        y: 9
                         width: 96
                         text_align: CENTER
                         text_font: font48
@@ -2437,7 +2476,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_status_p2
                         x: 218
-                        y: 21
+                        y: 20
                         width: 78
                         text_align: CENTER
                         text_font: font16
@@ -2445,7 +2484,7 @@ lvgl:
                         text: "Muy bajo"
                     - label:
                         x: 14
-                        y: 58
+                        y: 54
                         width: 48
                         text_align: CENTER
                         text_font: font10
@@ -2453,7 +2492,7 @@ lvgl:
                         text: "Muy bajo"
                     - label:
                         x: 68
-                        y: 58
+                        y: 54
                         width: 48
                         text_align: CENTER
                         text_font: font10
@@ -2461,7 +2500,7 @@ lvgl:
                         text: "Bajo"
                     - label:
                         x: 122
-                        y: 58
+                        y: 54
                         width: 48
                         text_align: CENTER
                         text_font: font10
@@ -2469,7 +2508,7 @@ lvgl:
                         text: "Medio"
                     - label:
                         x: 176
-                        y: 58
+                        y: 54
                         width: 48
                         text_align: CENTER
                         text_font: font10
@@ -2477,7 +2516,7 @@ lvgl:
                         text: "Alto"
                     - label:
                         x: 230
-                        y: 58
+                        y: 54
                         width: 48
                         text_align: CENTER
                         text_font: font10
@@ -2521,9 +2560,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_scale_marker_p2
                         x: 12
-                        y: 68
+                        y: 63
                         width: 5
-                        height: 14
+                        height: 13
                         bg_color: 0xFFFFFF
                         bg_opa: COVER
                         border_color: 0x101418
@@ -2532,9 +2571,9 @@ lvgl:
                         pad_all: 0
               - obj:
                   x: 8
-                  y: 102
+                  y: 95
                   width: 304
-                  height: 130
+                  height: 121
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -2550,19 +2589,19 @@ lvgl:
                         text: "Evolucion AQI"
                     - label:
                         x: 8
-                        y: 26
+                        y: 24
                         text_font: font10
                         text_color: 0x5B7388
                         text: "100"
                     - label:
                         x: 14
-                        y: 58
+                        y: 54
                         text_font: font10
                         text_color: 0x5B7388
                         text: "50"
                     - label:
                         x: 20
-                        y: 91
+                        y: 85
                         text_font: font10
                         text_color: 0x5B7388
                         text: "0"
@@ -2592,14 +2631,14 @@ lvgl:
                         line_width: 1
                     - label:
                         x: 232
-                        y: 26
+                        y: 24
                         text_font: font10
                         text_color: 0x8FC8FF
                         text: "PM1"
                     - label:
                         id: lvgl_pm1_value_p2
                         x: 270
-                        y: 26
+                        y: 24
                         width: 26
                         text_align: RIGHT
                         text_font: font10
@@ -2610,14 +2649,14 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 232
-                        y: 50
+                        y: 47
                         text_font: font10
                         text_color: 0x8FC8FF
                         text: "PM2.5"
                     - label:
                         id: lvgl_pm25_value_p2
                         x: 270
-                        y: 50
+                        y: 47
                         width: 26
                         text_align: RIGHT
                         text_font: font10
@@ -2628,14 +2667,14 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 232
-                        y: 74
+                        y: 69
                         text_font: font10
                         text_color: 0x8FC8FF
                         text: "PM10"
                     - label:
                         id: lvgl_pm10_value_p2
                         x: 270
-                        y: 74
+                        y: 69
                         width: 26
                         text_align: RIGHT
                         text_font: font10
@@ -2735,9 +2774,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -2747,9 +2786,9 @@ lvgl:
               - obj:
                   id: lvgl_co2_card_p3
                   x: 8
-                  y: 8
+                  y: 7
                   width: 304
-                  height: 86
+                  height: 80
                   bg_color: 0x2B2815
                   bg_opa: COVER
                   border_color: 0xF8D64E
@@ -2760,9 +2799,9 @@ lvgl:
                     - obj:
                         id: lvgl_co2_icon_box_p3
                         x: 10
-                        y: 10
+                        y: 9
                         width: 32
-                        height: 28
+                        height: 26
                         bg_color: 0x3D3715
                         bg_opa: COVER
                         border_color: 0xF8D64E
@@ -2779,14 +2818,14 @@ lvgl:
                     - label:
                         id: lvgl_co2_title_p3
                         x: 50
-                        y: 11
+                        y: 10
                         text_font: font16
                         text_color: 0xF8D64E
                         text: "CO2"
                     - label:
                         id: lvgl_co2_value_p3
                         x: 118
-                        y: 10
+                        y: 9
                         width: 96
                         text_align: CENTER
                         text_font: font48
@@ -2798,7 +2837,7 @@ lvgl:
                     - label:
                         id: lvgl_co2_status_p3
                         x: 216
-                        y: 21
+                        y: 20
                         width: 82
                         text_align: CENTER
                         text_font: font16
@@ -2806,7 +2845,7 @@ lvgl:
                         text: "Aceptable"
                     - label:
                         x: 14
-                        y: 58
+                        y: 54
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -2814,7 +2853,7 @@ lvgl:
                         text: "Bueno"
                     - label:
                         x: 82
-                        y: 58
+                        y: 54
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -2822,7 +2861,7 @@ lvgl:
                         text: "Aceptable"
                     - label:
                         x: 150
-                        y: 58
+                        y: 54
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -2830,7 +2869,7 @@ lvgl:
                         text: "Malo"
                     - label:
                         x: 218
-                        y: 58
+                        y: 54
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -2867,9 +2906,9 @@ lvgl:
                     - obj:
                         id: lvgl_co2_scale_marker_p3
                         x: 12
-                        y: 68
+                        y: 63
                         width: 5
-                        height: 14
+                        height: 13
                         bg_color: 0xFFFFFF
                         bg_opa: COVER
                         border_color: 0x101418
@@ -2878,9 +2917,9 @@ lvgl:
                         pad_all: 0
               - obj:
                   x: 8
-                  y: 102
+                  y: 95
                   width: 304
-                  height: 130
+                  height: 121
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -2896,19 +2935,19 @@ lvgl:
                         text: "Evolucion CO2"
                     - label:
                         x: 6
-                        y: 26
+                        y: 24
                         text_font: font10
                         text_color: 0x5B7388
                         text: "2000"
                     - label:
                         x: 6
-                        y: 58
+                        y: 54
                         text_font: font10
                         text_color: 0x5B7388
                         text: "1000"
                     - label:
                         x: 14
-                        y: 91
+                        y: 85
                         text_font: font10
                         text_color: 0x5B7388
                         text: "400"
@@ -3010,9 +3049,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -3022,9 +3061,9 @@ lvgl:
               - obj:
                   id: lvgl_voc_card_p4
                   x: 8
-                  y: 8
+                  y: 7
                   width: 304
-                  height: 106
+                  height: 99
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -3035,9 +3074,9 @@ lvgl:
                     - obj:
                         id: lvgl_voc_icon_box_p4
                         x: 10
-                        y: 10
+                        y: 9
                         width: 32
-                        height: 28
+                        height: 26
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -3054,14 +3093,14 @@ lvgl:
                     - label:
                         id: lvgl_voc_title_p4
                         x: 50
-                        y: 11
+                        y: 10
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "VOC"
                     - label:
                         id: lvgl_voc_value_p4
                         x: 104
-                        y: 10
+                        y: 9
                         width: 96
                         text_align: CENTER
                         text_font: font48
@@ -3073,7 +3112,7 @@ lvgl:
                     - label:
                         id: lvgl_voc_status_p4
                         x: 210
-                        y: 21
+                        y: 20
                         width: 88
                         text_align: CENTER
                         text_font: font16
@@ -3081,7 +3120,7 @@ lvgl:
                         text: "Bueno"
                     - label:
                         x: 14
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3089,7 +3128,7 @@ lvgl:
                         text: "Bueno"
                     - label:
                         x: 82
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3097,7 +3136,7 @@ lvgl:
                         text: "Regular"
                     - label:
                         x: 150
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3105,7 +3144,7 @@ lvgl:
                         text: "Malo"
                     - label:
                         x: 218
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3142,9 +3181,9 @@ lvgl:
                     - obj:
                         id: lvgl_voc_scale_marker_p4
                         x: 12
-                        y: 89
+                        y: 83
                         width: 5
-                        height: 14
+                        height: 13
                         bg_color: 0xFFFFFF
                         bg_opa: COVER
                         border_color: 0x101418
@@ -3154,9 +3193,9 @@ lvgl:
               - obj:
                   id: lvgl_nox_card_p4
                   x: 8
-                  y: 126
+                  y: 118
                   width: 304
-                  height: 106
+                  height: 99
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -3167,9 +3206,9 @@ lvgl:
                     - obj:
                         id: lvgl_nox_icon_box_p4
                         x: 10
-                        y: 10
+                        y: 9
                         width: 32
-                        height: 28
+                        height: 26
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -3186,14 +3225,14 @@ lvgl:
                     - label:
                         id: lvgl_nox_title_p4
                         x: 50
-                        y: 11
+                        y: 10
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "NOx"
                     - label:
                         id: lvgl_nox_value_p4
                         x: 104
-                        y: 10
+                        y: 9
                         width: 96
                         text_align: CENTER
                         text_font: font48
@@ -3205,7 +3244,7 @@ lvgl:
                     - label:
                         id: lvgl_nox_status_p4
                         x: 210
-                        y: 21
+                        y: 20
                         width: 88
                         text_align: CENTER
                         text_font: font16
@@ -3213,7 +3252,7 @@ lvgl:
                         text: "Limpio"
                     - label:
                         x: 14
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3221,7 +3260,7 @@ lvgl:
                         text: "Limpio"
                     - label:
                         x: 82
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3229,7 +3268,7 @@ lvgl:
                         text: "Bueno"
                     - label:
                         x: 150
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3237,7 +3276,7 @@ lvgl:
                         text: "Presencia"
                     - label:
                         x: 218
-                        y: 78
+                        y: 73
                         width: 60
                         text_align: CENTER
                         text_font: font10
@@ -3274,9 +3313,9 @@ lvgl:
                     - obj:
                         id: lvgl_nox_scale_marker_p4
                         x: 12
-                        y: 89
+                        y: 83
                         width: 5
-                        height: 14
+                        height: 13
                         bg_color: 0xFFFFFF
                         bg_opa: COVER
                         border_color: 0x101418
@@ -3290,9 +3329,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -3302,9 +3341,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_compare_local_card
                   x: 8
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 148
+                  height: 138
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -3315,9 +3354,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_compare_local_icon_box
                         x: 10
-                        y: 10
+                        y: 9
                         width: 36
-                        height: 30
+                        height: 28
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -3334,20 +3373,20 @@ lvgl:
                     - label:
                         id: lvgl_aqi_compare_local_title
                         x: 56
-                        y: 11
+                        y: 10
                         text_font: font16
                         text_color: 0x2DD36F
                         text: "LOCAL"
                     - label:
                         x: 56
-                        y: 29
+                        y: 27
                         text_font: font10
                         text_color: 0x8AA0A8
                         text: "AQI europeo"
                     - label:
                         id: lvgl_aqi_compare_local_value
                         x: 18
-                        y: 54
+                        y: 50
                         width: 112
                         text_align: CENTER
                         text_font: font48
@@ -3359,7 +3398,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_compare_local_status
                         x: 14
-                        y: 116
+                        y: 108
                         width: 120
                         text_align: CENTER
                         text_font: font16
@@ -3368,9 +3407,9 @@ lvgl:
               - obj:
                   id: lvgl_aqi_compare_tc_card
                   x: 164
-                  y: 8
+                  y: 7
                   width: 148
-                  height: 148
+                  height: 138
                   bg_color: 0x14241C
                   bg_opa: COVER
                   border_color: 0x2DD36F
@@ -3381,9 +3420,9 @@ lvgl:
                     - obj:
                         id: lvgl_aqi_compare_tc_icon_box
                         x: 10
-                        y: 10
+                        y: 9
                         width: 36
-                        height: 30
+                        height: 28
                         bg_color: 0x1E3A2B
                         bg_opa: COVER
                         border_color: 0x2DD36F
@@ -3400,20 +3439,20 @@ lvgl:
                     - label:
                         id: lvgl_aqi_compare_tc_title
                         x: 56
-                        y: 12
+                        y: 11
                         text_font: font10
                         text_color: 0x2DD36F
                         text: "TRES CANTOS"
                     - label:
                         x: 56
-                        y: 29
+                        y: 27
                         text_font: font10
                         text_color: 0x8AA0A8
                         text: "AQI europeo"
                     - label:
                         id: lvgl_aqi_compare_tc_value
                         x: 18
-                        y: 54
+                        y: 50
                         width: 112
                         text_align: CENTER
                         text_font: font48
@@ -3425,7 +3464,7 @@ lvgl:
                     - label:
                         id: lvgl_aqi_compare_tc_status
                         x: 14
-                        y: 116
+                        y: 108
                         width: 120
                         text_align: CENTER
                         text_font: font16
@@ -3433,9 +3472,9 @@ lvgl:
                         text: "Muy bajo"
               - obj:
                   x: 8
-                  y: 166
+                  y: 155
                   width: 70
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3445,20 +3484,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0x8FC8FF
                         text: "LOCAL"
                     - label:
                         x: 8
-                        y: 24
+                        y: 22
                         text_font: font16
                         text_color: 0x6AD8FF
                         text: "PM2.5"
                     - label:
                         id: lvgl_pm25_value_compare_local
                         x: 8
-                        y: 43
+                        y: 40
                         width: 44
                         text_align: RIGHT
                         text_font: font16
@@ -3469,15 +3508,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 54
-                        y: 47
+                        y: 44
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "ug"
               - obj:
                   x: 86
-                  y: 166
+                  y: 155
                   width: 70
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3487,20 +3526,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0x8FC8FF
                         text: "LOCAL"
                     - label:
                         x: 8
-                        y: 24
+                        y: 22
                         text_font: font16
                         text_color: 0x6AD8FF
                         text: "PM10"
                     - label:
                         id: lvgl_pm10_value_compare_local
                         x: 8
-                        y: 43
+                        y: 40
                         width: 44
                         text_align: RIGHT
                         text_font: font16
@@ -3511,15 +3550,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 54
-                        y: 47
+                        y: 44
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "ug"
               - obj:
                   x: 164
-                  y: 166
+                  y: 155
                   width: 70
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3529,20 +3568,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0xF8D64E
                         text: "TC"
                     - label:
                         x: 8
-                        y: 24
+                        y: 22
                         text_font: font16
                         text_color: 0x6AD8FF
                         text: "PM2.5"
                     - label:
                         id: lvgl_pm25_value_compare_tc
                         x: 8
-                        y: 43
+                        y: 40
                         width: 44
                         text_align: RIGHT
                         text_font: font16
@@ -3553,15 +3592,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 54
-                        y: 47
+                        y: 44
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "ug"
               - obj:
                   x: 242
-                  y: 166
+                  y: 155
                   width: 70
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3571,20 +3610,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0xF8D64E
                         text: "TC"
                     - label:
                         x: 8
-                        y: 24
+                        y: 22
                         text_font: font16
                         text_color: 0x6AD8FF
                         text: "PM10"
                     - label:
                         id: lvgl_pm10_value_compare_tc
                         x: 8
-                        y: 43
+                        y: 40
                         width: 44
                         text_align: RIGHT
                         text_font: font16
@@ -3595,7 +3634,7 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 54
-                        y: 47
+                        y: 44
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "ug"
@@ -3606,9 +3645,9 @@ lvgl:
       widgets:
         - obj:
             x: 0
-            y: 0
+            y: 16
             width: 320
-            height: 240
+            height: 224
             bg_color: 0x101418
             bg_opa: TRANSP
             border_width: 0
@@ -3617,9 +3656,9 @@ lvgl:
             widgets:
               - obj:
                   x: 8
-                  y: 8
+                  y: 7
                   width: 304
-                  height: 150
+                  height: 140
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3630,13 +3669,13 @@ lvgl:
                     - label:
                         id: lvgl_weather_provider_p4
                         x: 12
-                        y: 8
+                        y: 7
                         text_font: font16
                         text_color: 0x8FC8FF
                         text: "Tiempo"
                     - label:
                         x: 260
-                        y: 10
+                        y: 9
                         width: 32
                         text_align: RIGHT
                         text_font: font10
@@ -3646,7 +3685,7 @@ lvgl:
                         id: lvgl_weather_icon_p4
                         hidden: true
                         x: 22
-                        y: 36
+                        y: 34
                         width: 70
                         text_align: CENTER
                         text_font: mdi_weather_48
@@ -3656,7 +3695,7 @@ lvgl:
                         id: lvgl_weather_temp_p4
                         hidden: true
                         x: 104
-                        y: 28
+                        y: 26
                         width: 102
                         text_align: RIGHT
                         text_font: font32
@@ -3669,7 +3708,7 @@ lvgl:
                         id: lvgl_weather_condition_p4
                         hidden: true
                         x: 214
-                        y: 38
+                        y: 35
                         width: 78
                         text_align: CENTER
                         text_font: font16
@@ -3679,7 +3718,7 @@ lvgl:
                         id: lvgl_weather_feels_title_p4
                         hidden: true
                         x: 120
-                        y: 68
+                        y: 63
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Sensacion"
@@ -3687,7 +3726,7 @@ lvgl:
                         id: lvgl_weather_feels_p4
                         hidden: true
                         x: 174
-                        y: 68
+                        y: 63
                         width: 32
                         text_align: RIGHT
                         text_font: font10
@@ -3700,7 +3739,7 @@ lvgl:
                         id: lvgl_weather_max_title_p4
                         hidden: true
                         x: 18
-                        y: 102
+                        y: 95
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Max"
@@ -3708,7 +3747,7 @@ lvgl:
                         id: lvgl_weather_max_p4
                         hidden: true
                         x: 84
-                        y: 102
+                        y: 95
                         width: 42
                         text_align: RIGHT
                         text_font: font10
@@ -3721,7 +3760,7 @@ lvgl:
                         id: lvgl_weather_min_title_p4
                         hidden: true
                         x: 18
-                        y: 124
+                        y: 116
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Min"
@@ -3729,7 +3768,7 @@ lvgl:
                         id: lvgl_weather_min_p4
                         hidden: true
                         x: 84
-                        y: 124
+                        y: 116
                         width: 42
                         text_align: RIGHT
                         text_font: font10
@@ -3742,7 +3781,7 @@ lvgl:
                         id: lvgl_weather_rain_title_p4
                         hidden: true
                         x: 160
-                        y: 102
+                        y: 95
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Lluvia"
@@ -3750,7 +3789,7 @@ lvgl:
                         id: lvgl_weather_rain_p4
                         hidden: true
                         x: 248
-                        y: 102
+                        y: 95
                         width: 42
                         text_align: RIGHT
                         text_font: font10
@@ -3763,7 +3802,7 @@ lvgl:
                         id: lvgl_weather_humidity_title_p4
                         hidden: true
                         x: 160
-                        y: 124
+                        y: 116
                         text_font: font10
                         text_color: 0x5B7388
                         text: "Humedad"
@@ -3771,7 +3810,7 @@ lvgl:
                         id: lvgl_weather_humidity_p4
                         hidden: true
                         x: 248
-                        y: 124
+                        y: 116
                         width: 42
                         text_align: RIGHT
                         text_font: font10
@@ -3782,9 +3821,9 @@ lvgl:
                           if_nan: "--"
               - obj:
                   x: 8
-                  y: 166
+                  y: 155
                   width: 96
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3794,20 +3833,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: mdi_icons_18
                         text_color: 0x6AD8FF
                         text: "\U000F050F"
                     - label:
                         x: 32
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "TEMP"
                     - label:
                         id: lvgl_temperature_value_p4
                         x: 8
-                        y: 34
+                        y: 32
                         width: 56
                         text_align: RIGHT
                         text_font: font16
@@ -3818,15 +3857,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 66
-                        y: 37
+                        y: 35
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "°C"
               - obj:
                   x: 112
-                  y: 166
+                  y: 155
                   width: 96
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3836,20 +3875,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: mdi_icons_18
                         text_color: 0x6AD8FF
                         text: "\U000F058E"
                     - label:
                         x: 32
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "HUM"
                     - label:
                         id: lvgl_humidity_value_p4
                         x: 8
-                        y: 34
+                        y: 32
                         width: 56
                         text_align: RIGHT
                         text_font: font16
@@ -3860,15 +3899,15 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 66
-                        y: 37
+                        y: 35
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "%"
               - obj:
                   x: 216
-                  y: 166
+                  y: 155
                   width: 96
-                  height: 66
+                  height: 62
                   bg_color: 0x111A22
                   bg_opa: COVER
                   border_color: 0x1F3140
@@ -3878,20 +3917,20 @@ lvgl:
                   widgets:
                     - label:
                         x: 8
-                        y: 8
+                        y: 7
                         text_font: mdi_icons_18
                         text_color: 0x6AD8FF
                         text: "\U000F029A"
                     - label:
                         x: 32
-                        y: 8
+                        y: 7
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "PRES"
                     - label:
                         id: lvgl_pressure_value_p4
                         x: 4
-                        y: 34
+                        y: 32
                         width: 58
                         text_align: RIGHT
                         text_font: font16
@@ -3902,23 +3941,45 @@ lvgl:
                           if_nan: "--"
                     - label:
                         x: 64
-                        y: 37
+                        y: 35
                         text_font: font10
                         text_color: 0x6AD8FF
                         text: "hPa"
 
   top_layer:
     widgets:
-      # - label:
-      #     text: "\uF1EB"
-      #     id: lbl_hastatus
-      #     hidden: true
-      #     align: top_right
-      #     x: -2
-      #     y: 7
-      #     text_align: right
-      #     text_color: 0xFFFFFF
-        
+      # Barra de conectividad visible en todas las páginas.
+      - obj:
+          x: 0
+          y: 0
+          width: 100%
+          height: 16
+          bg_color: 0x080B0D
+          bg_opa: COVER
+          border_color: 0x273038
+          border_width: 1
+          border_side: BOTTOM
+          radius: 0
+          pad_all: 0
+          clickable: false
+          scrollable: false
+          widgets:
+            - label:
+                id: lbl_wifi_status
+                x: 6
+                y: 1
+                text: "\U000F05A9"
+                text_font: mdi_status_14
+                text_color: 0xFF5252
+            - label:
+                id: lbl_ha_status
+                align: TOP_RIGHT
+                x: -6
+                y: 1
+                text: "\U000F07D0"
+                text_font: mdi_status_14
+                text_color: 0xFF5252
+
       # make sure it's the last one in this list:
       - obj:
           id: boot_screen
