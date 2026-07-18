@@ -19,6 +19,15 @@ esphome:
           - lvgl.label.update:
               id: lbl_ha_status
               text_color: 0x2DD36F
+    - if:
+        condition:
+          time.has_time:
+        then:
+          - lvgl.label.update:
+              id: lbl_clock
+              text:
+                time_format: "%H:%M"
+                time: sntp_time
 
 external_components:
   #- source: github://rafaalbelda/cm1106sl_ns@i2c
@@ -130,6 +139,63 @@ spi:
     #miso_pin: 19
 
 script:
+  - id: update_window_status
+    then:
+      - if:
+          condition:
+            lambda: |-
+              const float indoor = id(my_temperature).state;
+              const float outdoor = id(active_weather_provider) == 1
+                ? id(ha_weather_temperature).state
+                : id(active_weather_provider) == 2
+                  ? id(ha_weather_openweathermap_temperature).state
+                  : NAN;
+              if (std::isnan(indoor) || std::isnan(outdoor)) return false;
+              if (indoor >= 25.0f) {
+                return outdoor <= indoor - 1.0f;
+              }
+              return outdoor >= indoor + 1.0f;
+          then:
+            - lvgl.label.update:
+                id: lbl_window_status_bar
+                text: "\U000F05B1"
+                text_color: 0x2DD36F
+            - lvgl.label.update:
+                id: lvgl_window_recommendation_p4
+                text: "ABRIR VENTANAS"
+                text_color: 0x2DD36F
+            - lvgl.widget.show: lbl_window_status_bar
+            - lvgl.widget.show: lvgl_window_recommendation_p4
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    const float indoor = id(my_temperature).state;
+                    const float outdoor = id(active_weather_provider) == 1
+                      ? id(ha_weather_temperature).state
+                      : id(active_weather_provider) == 2
+                        ? id(ha_weather_openweathermap_temperature).state
+                        : NAN;
+                    if (std::isnan(indoor) || std::isnan(outdoor)) return false;
+                    if (indoor >= 25.0f) {
+                      return outdoor >= indoor + 1.0f;
+                    }
+                    return outdoor <= indoor - 1.0f;
+                then:
+                  - lvgl.label.update:
+                      id: lbl_window_status_bar
+                      text: "\U000F05AE"
+                      text_color: 0x6AD8FF
+                  - lvgl.label.update:
+                      id: lvgl_window_recommendation_p4
+                      text: "CERRAR VENTANAS"
+                      text_color: 0x6AD8FF
+                  - lvgl.widget.show: lbl_window_status_bar
+                  - lvgl.widget.show: lvgl_window_recommendation_p4
+                else:
+                  - lvgl.widget.hide: lbl_window_status_bar
+                  - lvgl.widget.hide: lvgl_window_recommendation_p4
+
   - id: update_ventilation_status
     then:
       - if:
@@ -145,6 +211,7 @@ script:
                 id: lvgl_ventilation_card
                 bg_color: 0x2D2014
                 border_color: 0xFF8C1A
+            - lvgl.widget.show: lbl_ventilation_status_bar
           else:
             - lvgl.label.update:
                 id: lvgl_ventilation_status
@@ -154,6 +221,27 @@ script:
                 id: lvgl_ventilation_card
                 bg_color: 0x14241C
                 border_color: 0x2DD36F
+            - lvgl.widget.hide: lbl_ventilation_status_bar
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Madrid
+    on_time_sync:
+      then:
+        - lvgl.label.update:
+            id: lbl_clock
+            text:
+              time_format: "%H:%M"
+              time: sntp_time
+    on_time:
+      - seconds: 0
+        then:
+          - lvgl.label.update:
+              id: lbl_clock
+              text:
+                time_format: "%H:%M"
+                time: sntp_time
 
 sensor:
   - platform: sgp4x
@@ -584,6 +672,7 @@ sensor:
                 format: "%.1f"
                 args: [ 'x' ]
                 if_nan: "--"
+          - script.execute: update_window_status
     pressure:
       name: "Presión"
       id: my_pressure
@@ -997,6 +1086,7 @@ sensor:
                     format: "%.1f°C"
                     args: [ 'x' ]
                     if_nan: "--"
+        - script.execute: update_window_status
 
   - platform: homeassistant
     id: ha_weather_apparent_temperature
@@ -1095,6 +1185,7 @@ sensor:
                     format: "%.1f°C"
                     args: [ 'x' ]
                     if_nan: "--"
+        - script.execute: update_window_status
 
   - platform: homeassistant
     id: ha_weather_openweathermap_apparent_temperature
@@ -1281,6 +1372,7 @@ text_sensor:
                     if (x == "fog") return "\U000F0591";
                     if (x == "windy" || x == "windy-variant") return "\U000F059D";
                     return "\U000F0595";
+        - script.execute: update_window_status
 
   - platform: homeassistant
     id: ha_weather_openweathermap_condition
@@ -1362,6 +1454,7 @@ text_sensor:
                         id: lvgl_weather_provider_p4
                         text: "Tiempo"
                     - lvgl.widget.hide: [lvgl_weather_icon_p4, lvgl_weather_temp_p4, lvgl_weather_condition_p4, lvgl_weather_feels_title_p4, lvgl_weather_feels_p4, lvgl_weather_max_title_p4, lvgl_weather_max_p4, lvgl_weather_min_title_p4, lvgl_weather_min_p4, lvgl_weather_rain_title_p4, lvgl_weather_rain_p4, lvgl_weather_humidity_title_p4, lvgl_weather_humidity_p4]
+        - script.execute: update_window_status
 
 binary_sensor:
   - platform: gpio
@@ -1538,6 +1631,9 @@ font:
     glyphs: [
       "\U000F05A9", # mdi-wifi
       "\U000F07D0", # mdi-home-assistant
+      "\U000F0D43", # mdi-air-filter (ventilation warning)
+      "\U000F05AE", # mdi-window-closed
+      "\U000F05B1", # mdi-window-open
       ]
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: mdi_weather_48
@@ -3674,13 +3770,15 @@ lvgl:
                         text_color: 0x8FC8FF
                         text: "Tiempo"
                     - label:
-                        x: 260
+                        id: lvgl_window_recommendation_p4
+                        hidden: true
+                        x: 142
                         y: 9
-                        width: 32
+                        width: 150
                         text_align: RIGHT
                         text_font: font10
-                        text_color: 0x5B7388
-                        text: "Hoy"
+                        text_color: 0x2DD36F
+                        text: "ABRIR VENTANAS"
                     - label:
                         id: lvgl_weather_icon_p4
                         hidden: true
@@ -3973,12 +4071,36 @@ lvgl:
                 text_color: 0xFF5252
             - label:
                 id: lbl_ha_status
-                align: TOP_RIGHT
-                x: -6
+                x: 26
                 y: 1
                 text: "\U000F07D0"
                 text_font: mdi_status_14
                 text_color: 0xFF5252
+            - label:
+                id: lbl_clock
+                align: TOP_MID
+                y: 2
+                text: "--:--"
+                text_font: font10
+                text_color: 0xFFFFFF
+            - label:
+                id: lbl_ventilation_status_bar
+                hidden: true
+                align: TOP_RIGHT
+                x: -6
+                y: 1
+                text: "\U000F0D43"
+                text_font: mdi_status_14
+                text_color: 0xFF8C1A
+            - label:
+                id: lbl_window_status_bar
+                hidden: true
+                align: TOP_RIGHT
+                x: -26
+                y: 1
+                text: "\U000F05B1"
+                text_font: mdi_status_14
+                text_color: 0x2DD36F
 
       # make sure it's the last one in this list:
       - obj:
