@@ -74,9 +74,12 @@ api:
               id: lbl_ha_status
               text_color: 0xFF5252
 
+http_request:
+
 ota:
   - platform: esphome
     password: !secret airq32_w_ota_password
+  - platform: http_request
 
 wifi:
   ssid: !secret wifi_ssid
@@ -1478,6 +1481,20 @@ button:
       - select.next:
           id: display_page
           cycle: true
+  - platform: template
+    name: "Instalar pantalla horizontal"
+    icon: "mdi:monitor"
+    on_press:
+      - ota.http_request.flash:
+          url: http://192.168.1.250:8123/local/firmware/firmware-horizontal.ota.bin
+          md5_url: http://192.168.1.250:8123/local/firmware/firmware-horizontal.md5
+  - platform: template
+    name: "Instalar pantalla vertical"
+    icon: "mdi:cellphone"
+    on_press:
+      - ota.http_request.flash:
+          url: http://192.168.1.250:8123/local/firmware/firmware-vertical.ota.bin
+          md5_url: http://192.168.1.250:8123/local/firmware/firmware-vertical.md5
 
 select:
   - platform: template
