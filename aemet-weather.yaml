@@ -1,0 +1,703 @@
+substitutions:
+  # Municipio inicial (Tres Cantos). El valor elegido desde la web tiene
+  # prioridad y queda almacenado en flash.
+  aemet_municipality: "28903"
+  # Valor inicial. La clave guardada desde la web tiene prioridad tras el
+  # primer arranque y se conserva entre reinicios.
+  aemet_api_key_default: !secret aemet_api_key
+
+http_request:
+  id: aemet_http
+  timeout: 30s
+  follow_redirects: true
+  redirect_limit: 3
+  verify_ssl: true
+  useragent: AirQ32-W/1.0 ESPHome
+
+globals:
+  - id: aemet_municipality_code
+    type: std::string
+    restore_value: true
+    max_restore_data_length: 5
+    initial_value: '"${aemet_municipality}"'
+  - id: aemet_municipality_name
+    type: std::string
+    restore_value: true
+    max_restore_data_length: 80
+    initial_value: '"Tres Cantos"'
+  - id: aemet_municipalities_url
+    type: std::string
+    restore_value: false
+  - id: aemet_municipality_query
+    type: std::string
+    restore_value: false
+  - id: aemet_municipalities_pending
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: aemet_municipality_refresh_pending
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  # ESPHome limita las cadenas restaurables a 254 caracteres. Las claves de
+  # AEMET actuales son más largas, por lo que se guardan en dos fragmentos.
+  - id: aemet_api_key_part_1
+    type: std::string
+    restore_value: true
+    max_restore_data_length: 200
+    initial_value: 'std::string("${aemet_api_key_default}").substr(0, 200)'
+  - id: aemet_api_key_part_2
+    type: std::string
+    restore_value: true
+    max_restore_data_length: 200
+    initial_value: 'std::string("${aemet_api_key_default}").size() > 200 ? std::string("${aemet_api_key_default}").substr(200) : std::string()'
+  - id: aemet_data_url
+    type: std::string
+    restore_value: false
+  - id: aemet_data_pending
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: aemet_last_request_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+script:
+  # Primera petición: obtiene la URL temporal del conjunto de datos.
+  - id: fetch_aemet_weather
+    mode: single
+    then:
+      - if:
+          condition:
+            and:
+              - wifi.connected:
+              - lambda: |-
+                  return id(aemet_last_request_ms) == 0
+                    || (millis() - id(aemet_last_request_ms)) >= 60000;
+          then:
+            - lambda: |-
+                id(aemet_last_request_ms) = millis();
+                id(aemet_status).publish_state("Consultando");
+            - http_request.get:
+                url: !lambda |-
+                  static std::string url;
+                  url = "https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/horaria/";
+                  url += id(aemet_municipality_code);
+                  return url.c_str();
+                request_headers:
+                  api_key: !lambda |-
+                    static std::string api_key;
+                    api_key = id(aemet_api_key_part_1) + id(aemet_api_key_part_2);
+                    return api_key.c_str();
+                capture_response: true
+                max_response_buffer_size: 2048
+                on_response:
+                  then:
+                    - lambda: |-
+                        id(aemet_data_url).clear();
+                        id(aemet_data_pending) = false;
+                        if (response->status_code != 200) {
+                          ESP_LOGW("aemet", "Error en la consulta inicial: HTTP %d", response->status_code);
+                          if (response->status_code == 429) {
+                            id(aemet_status).publish_state("Límite AEMET (429)");
+                          } else {
+                            id(aemet_status).publish_state("Error de acceso");
+                          }
+                          return;
+                        }
+                        const bool parsed = json::parse_json(body, [](JsonObject root) -> bool {
+                          const char *url = root["datos"] | "";
+                          if (url[0] == '\0') return false;
+                          id(aemet_data_url) = url;
+                          id(aemet_data_pending) = true;
+                          return true;
+                        });
+                        if (!parsed) {
+                          ESP_LOGW("aemet", "La respuesta no contiene una URL de datos válida");
+                          id(aemet_status).publish_state("Respuesta no válida");
+                        }
+                on_error:
+                  then:
+                    - lambda: |-
+                        id(aemet_data_pending) = false;
+                        id(aemet_status).publish_state("Error de conexión");
+
+  # Segunda petición: descarga y procesa la predicción horaria.
+  # Debe estar separada de la primera para evitar parámetros response/body
+  # duplicados en el código generado por ESPHome 2026.7.x.
+  - id: fetch_aemet_data
+    mode: single
+    then:
+      - http_request.get:
+          url: !lambda 'return id(aemet_data_url);'
+          # El cuerpo se procesa directamente desde HttpContainer. En ESP-IDF,
+          # capture_response puede devolver una cadena vacía con respuestas
+          # grandes aunque Content-Length sea correcto.
+          capture_response: false
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) {
+                    ESP_LOGW("aemet", "Error al descargar la predicción: HTTP %d", response->status_code);
+                    id(aemet_status).publish_state("Error de descarga");
+                    return;
+                  }
+
+                  // Lector por bloques sobre la respuesta HTTP. Evita reservar
+                  // un std::string contiguo de unos 30 kB y normaliza los textos
+                  // ISO-8859-15 de AEMET mientras se reciben.
+                  class AemetHttpReader {
+                   public:
+                    explicit AemetHttpReader(
+                        const std::shared_ptr<http_request::HttpContainer> &container)
+                        : container_(container) {}
+
+                    int read() {
+                      if (position_ >= available_ && !this->refill_()) return -1;
+                      uint8_t value = buffer_[position_++];
+                      bytes_read_++;
+                      return value >= 0x80 ? '?' : value;
+                    }
+
+                    size_t readBytes(char *destination, size_t length) {
+                      size_t count = 0;
+                      while (count < length) {
+                        const int value = this->read();
+                        if (value < 0) break;
+                        destination[count++] = static_cast<char>(value);
+                      }
+                      return count;
+                    }
+
+                    size_t bytes_read() const { return bytes_read_; }
+
+                   private:
+                    bool refill_() {
+                      position_ = 0;
+                      available_ = 0;
+                      const uint32_t started = millis();
+                      while (true) {
+                        const int count = container_->read(buffer_, sizeof(buffer_));
+                        App.feed_wdt();
+                        yield();
+                        if (count > 0) {
+                          available_ = static_cast<size_t>(count);
+                          return true;
+                        }
+                        if (count < 0 || container_->is_read_complete()
+                            || millis() - started >= 15000) return false;
+                        delay(1);
+                      }
+                    }
+
+                    std::shared_ptr<http_request::HttpContainer> container_;
+                    uint8_t buffer_[512];
+                    size_t position_{0};
+                    size_t available_{0};
+                    size_t bytes_read_{0};
+                  };
+
+                  // Conserva solamente las ramas utilizadas. La predicción
+                  // completa contiene muchos datos de viento, nieve y metadatos;
+                  // filtrarla evita agotar el heap en un ESP32 con LVGL activo.
+                  JsonDocument filter;
+                  filter[0]["prediccion"]["dia"][0]["temperatura"] = true;
+                  filter[0]["prediccion"]["dia"][0]["sensTermica"] = true;
+                  filter[0]["prediccion"]["dia"][0]["humedadRelativa"] = true;
+                  filter[0]["prediccion"]["dia"][0]["probPrecipitacion"] = true;
+                  filter[0]["prediccion"]["dia"][0]["estadoCielo"] = true;
+
+                  JsonDocument document;
+                  AemetHttpReader reader(response);
+                  const DeserializationError error = deserializeJson(
+                    document, reader, DeserializationOption::Filter(filter));
+                  if (error) {
+                    ESP_LOGW("aemet", "JSON no válido (%u bytes): %s",
+                             static_cast<unsigned>(reader.bytes_read()), error.c_str());
+                    std::string status = "JSON: ";
+                    status += error.c_str();
+                    id(aemet_status).publish_state(status);
+                    return;
+                  }
+                  ESP_LOGD("aemet", "Predicción procesada en streaming: %u bytes",
+                           static_cast<unsigned>(reader.bytes_read()));
+
+                  JsonArray locations = document.as<JsonArray>();
+                  if (locations.isNull() || locations.size() == 0) {
+                    ESP_LOGW("aemet", "La predicción no contiene ubicaciones");
+                    id(aemet_status).publish_state("Sin predicción");
+                    return;
+                  }
+                  JsonArray days = locations[0]["prediccion"]["dia"].as<JsonArray>();
+                  if (days.isNull() || days.size() == 0) {
+                    ESP_LOGW("aemet", "La predicción no contiene días");
+                    id(aemet_status).publish_state("Sin predicción");
+                    return;
+                  }
+                  JsonObject day = days[0];
+                  auto now = id(sntp_time).now();
+                  const int current_hour = now.is_valid() ? now.hour : 12;
+
+                  auto closest_value = [&](const char *field, float fallback) -> float {
+                    JsonArray values = day[field].as<JsonArray>();
+                    float selected = fallback;
+                    int best_distance = 99;
+                    for (JsonObject item : values) {
+                      const char *period = item["periodo"] | "";
+                      if (period[0] == '\0') continue;
+                      const int hour = atoi(period);
+                      const int distance = abs(hour - current_hour);
+                      if (distance < best_distance) {
+                        best_distance = distance;
+                        selected = item["value"].as<float>();
+                      }
+                    }
+                    return selected;
+                  };
+
+                  float minimum = 100.0f;
+                  float maximum = -100.0f;
+                  JsonArray temperatures = day["temperatura"].as<JsonArray>();
+                  for (JsonObject item : temperatures) {
+                    const float value = item["value"].as<float>();
+                    if (value < minimum) minimum = value;
+                    if (value > maximum) maximum = value;
+                  }
+                  if (minimum > maximum) {
+                    minimum = NAN;
+                    maximum = NAN;
+                  }
+
+                  const float temperature = closest_value("temperatura", NAN);
+                  const float apparent = closest_value("sensTermica", temperature);
+                  const float humidity = closest_value("humedadRelativa", NAN);
+                  float precipitation = NAN;
+                  JsonArray precipitation_values = day["probPrecipitacion"].as<JsonArray>();
+                  for (JsonObject item : precipitation_values) {
+                    const float value = item["value"].as<float>();
+                    if (std::isnan(precipitation) || value > precipitation) precipitation = value;
+                  }
+
+                  std::string sky_code;
+                  int sky_distance = 99;
+                  JsonArray sky_values = day["estadoCielo"].as<JsonArray>();
+                  for (JsonObject item : sky_values) {
+                    const char *period = item["periodo"] | "";
+                    const char *value = item["value"] | "";
+                    if (period[0] == '\0' || value[0] == '\0') continue;
+                    const int distance = abs(atoi(period) - current_hour);
+                    if (distance < sky_distance) {
+                      sky_distance = distance;
+                      sky_code = value;
+                    }
+                  }
+
+                  std::string condition = "partlycloudy";
+                  const int code = sky_code.empty() ? 0 : atoi(sky_code.c_str());
+                  if (code == 11) condition = "sunny";
+                  else if (code >= 12 && code <= 13) condition = "partlycloudy";
+                  else if (code >= 14 && code <= 17) condition = "cloudy";
+                  else if (code >= 23 && code <= 26) condition = code >= 25 ? "pouring" : "rainy";
+                  else if (code >= 33 && code <= 36) condition = "snowy";
+                  else if (code >= 43 && code <= 54) condition = "lightning-rainy";
+                  else if (code >= 61 && code <= 64) condition = "snowy";
+                  else if (code >= 71 && code <= 74) condition = "rainy";
+                  else if (code == 81 || code == 82) condition = "fog";
+
+                  if (!std::isnan(temperature)) id(ha_weather_temperature).publish_state(temperature);
+                  if (!std::isnan(apparent)) id(ha_weather_apparent_temperature).publish_state(apparent);
+                  if (!std::isnan(maximum)) id(ha_weather_temperature_high).publish_state(maximum);
+                  if (!std::isnan(minimum)) id(ha_weather_temperature_low).publish_state(minimum);
+                  if (!std::isnan(precipitation)) id(ha_weather_precipitation_probability).publish_state(precipitation);
+                  if (!std::isnan(humidity)) id(ha_weather_humidity).publish_state(humidity);
+                  id(ha_weather_condition).publish_state(condition);
+                  id(aemet_status).publish_state("Actualizado");
+                  if (now.is_valid()) {
+                    // Los campos de ESPTime son enteros de 8/16 bits. Aunque
+                    // sus valores válidos caben en 17 bytes, GCC contempla todo
+                    // su rango al comprobar snprintf y exige un margen mayor.
+                    char updated_at[24];
+                    snprintf(updated_at, sizeof(updated_at), "%02d/%02d/%04d %02d:%02d",
+                             now.day_of_month, now.month, now.year, now.hour, now.minute);
+                    id(aemet_last_update).publish_state(updated_at);
+                  }
+                  ESP_LOGI("aemet", "Predicción de %s actualizada",
+                           id(aemet_municipality_name).c_str());
+          on_error:
+            then:
+              - lambda: 'id(aemet_status).publish_state("Error de conexión");'
+
+  # Obtiene la URL temporal del catálogo oficial de municipios.
+  - id: fetch_aemet_municipalities
+    mode: single
+    then:
+      - lambda: |-
+          id(aemet_municipalities_url).clear();
+          id(aemet_municipalities_pending) = false;
+          id(aemet_status).publish_state("Buscando municipio");
+      - http_request.get:
+          url: https://opendata.aemet.es/opendata/api/maestro/municipios
+          request_headers:
+            api_key: !lambda |-
+              static std::string api_key;
+              api_key = id(aemet_api_key_part_1) + id(aemet_api_key_part_2);
+              return api_key.c_str();
+          capture_response: true
+          max_response_buffer_size: 2048
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) {
+                    ESP_LOGW("aemet", "Error al solicitar municipios: HTTP %d",
+                             response->status_code);
+                    id(aemet_status).publish_state(
+                      response->status_code == 429 ? "Límite AEMET (429)" : "Error al buscar municipio");
+                    return;
+                  }
+                  const bool parsed = json::parse_json(body, [](JsonObject root) -> bool {
+                    const char *url = root["datos"] | "";
+                    if (url[0] == '\0') return false;
+                    id(aemet_municipalities_url) = url;
+                    id(aemet_municipalities_pending) = true;
+                    return true;
+                  });
+                  if (!parsed) id(aemet_status).publish_state("Catálogo no válido");
+          on_error:
+            then:
+              - lambda: 'id(aemet_status).publish_state("Error al buscar municipio");'
+
+  # Recorre el catálogo por bloques. Solo mantiene en memoria un municipio
+  # cada vez para no agotar el heap del ESP32.
+  - id: search_aemet_municipalities
+    mode: single
+    then:
+      - http_request.get:
+          url: !lambda 'return id(aemet_municipalities_url);'
+          capture_response: false
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) {
+                    ESP_LOGW("aemet", "Error al descargar municipios: HTTP %d",
+                             response->status_code);
+                    id(aemet_status).publish_state("Error de catálogo");
+                    return;
+                  }
+
+                  auto normalize = [](const std::string &value) -> std::string {
+                    std::string result;
+                    result.reserve(value.size());
+                    for (size_t i = 0; i < value.size(); i++) {
+                      const uint8_t c = static_cast<uint8_t>(value[i]);
+                      if (c < 0x80) {
+                        if (c >= 'A' && c <= 'Z') result.push_back(static_cast<char>(c + 32));
+                        else if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) result.push_back(c);
+                        continue;
+                      }
+                      if (c == 0xC3 && i + 1 < value.size()) {
+                        const uint8_t second = static_cast<uint8_t>(value[++i]);
+                        if ((second >= 0x80 && second <= 0x85) || (second >= 0xA0 && second <= 0xA5)) result.push_back('a');
+                        else if (second == 0x87 || second == 0xA7) result.push_back('c');
+                        else if ((second >= 0x88 && second <= 0x8B) || (second >= 0xA8 && second <= 0xAB)) result.push_back('e');
+                        else if ((second >= 0x8C && second <= 0x8F) || (second >= 0xAC && second <= 0xAF)) result.push_back('i');
+                        else if (second == 0x91 || second == 0xB1) result.push_back('n');
+                        else if ((second >= 0x92 && second <= 0x96) || (second >= 0xB2 && second <= 0xB6)) result.push_back('o');
+                        else if ((second >= 0x99 && second <= 0x9C) || (second >= 0xB9 && second <= 0xBC)) result.push_back('u');
+                        continue;
+                      }
+                      // Algunos conjuntos históricos de AEMET usan ISO-8859-15
+                      // en lugar de UTF-8.
+                      if ((c >= 0xC0 && c <= 0xC5) || (c >= 0xE0 && c <= 0xE5)) result.push_back('a');
+                      else if (c == 0xC7 || c == 0xE7) result.push_back('c');
+                      else if ((c >= 0xC8 && c <= 0xCB) || (c >= 0xE8 && c <= 0xEB)) result.push_back('e');
+                      else if ((c >= 0xCC && c <= 0xCF) || (c >= 0xEC && c <= 0xEF)) result.push_back('i');
+                      else if (c == 0xD1 || c == 0xF1) result.push_back('n');
+                      else if ((c >= 0xD2 && c <= 0xD6) || (c >= 0xF2 && c <= 0xF6)) result.push_back('o');
+                      else if ((c >= 0xD9 && c <= 0xDC) || (c >= 0xF9 && c <= 0xFC)) result.push_back('u');
+                    }
+                    return result;
+                  };
+
+                  const std::string wanted = normalize(id(aemet_municipality_query));
+                  bool wanted_is_code = id(aemet_municipality_query).size() == 5;
+                  for (const char c : id(aemet_municipality_query)) {
+                    if (c < '0' || c > '9') wanted_is_code = false;
+                  }
+                  std::string found_code;
+                  std::string found_name;
+                  size_t matches = 0;
+                  size_t objects = 0;
+                  std::string object;
+                  object.reserve(768);
+                  int depth = 0;
+                  bool in_string = false;
+                  bool escaped = false;
+                  bool overflow = false;
+                  bool stream_failed = false;
+                  uint8_t buffer[512];
+                  uint32_t idle_started = millis();
+
+                  while (true) {
+                    const int count = response->read(buffer, sizeof(buffer));
+                    App.feed_wdt();
+                    yield();
+                    if (count < 0) {
+                      stream_failed = !response->is_read_complete();
+                      break;
+                    }
+                    if (count == 0) {
+                      if (response->is_read_complete()) break;
+                      if (millis() - idle_started >= 15000) {
+                        stream_failed = true;
+                        break;
+                      }
+                      delay(1);
+                      continue;
+                    }
+                    idle_started = millis();
+                    for (int index = 0; index < count; index++) {
+                      const char c = static_cast<char>(buffer[index]);
+                      if (depth == 0) {
+                        if (c != '{') continue;
+                        object.clear();
+                        object.push_back(c);
+                        depth = 1;
+                        in_string = false;
+                        escaped = false;
+                        overflow = false;
+                        continue;
+                      }
+                      if (!overflow) {
+                        if (object.size() < 2048) object.push_back(c);
+                        else overflow = true;
+                      }
+                      if (in_string) {
+                        if (escaped) escaped = false;
+                        else if (c == '\\') escaped = true;
+                        else if (c == '"') in_string = false;
+                      } else {
+                        if (c == '"') in_string = true;
+                        else if (c == '{') depth++;
+                        else if (c == '}') depth--;
+                      }
+                      if (depth != 0) continue;
+                      if (overflow) continue;
+                      JsonDocument municipality;
+                      if (deserializeJson(municipality, object)) continue;
+                      objects++;
+                      const char *raw_name = municipality["nombre"] | "";
+                      const char *raw_id = municipality["id"] | "";
+                      if (raw_name[0] == '\0' || raw_id[0] == '\0') continue;
+                      std::string digits;
+                      for (const char *p = raw_id; *p != '\0'; p++) {
+                        if (*p >= '0' && *p <= '9') digits.push_back(*p);
+                      }
+                      if (digits.size() > 5) digits = digits.substr(digits.size() - 5);
+                      const bool matches_query = wanted_is_code
+                        ? digits == id(aemet_municipality_query)
+                        : normalize(raw_name) == wanted;
+                      if (!matches_query || digits.size() != 5) continue;
+                      matches++;
+                      found_code = digits;
+                      found_name = raw_name;
+                    }
+                  }
+
+                  ESP_LOGI("aemet", "Catálogo procesado: %u municipios, %u coincidencias",
+                           static_cast<unsigned>(objects), static_cast<unsigned>(matches));
+                  if (stream_failed) {
+                    id(aemet_status).publish_state("Catálogo incompleto");
+                  } else if (matches == 1) {
+                    id(aemet_municipality_code) = found_code;
+                    id(aemet_municipality_name) = found_name;
+                    id(aemet_current_municipality).publish_state(found_name);
+                    id(aemet_status).publish_state("Municipio actualizado");
+                    id(aemet_last_request_ms) = 0;
+                    id(aemet_municipality_refresh_pending) = true;
+                  } else if (matches > 1) {
+                    id(aemet_status).publish_state("Nombre ambiguo: usa código INE");
+                  } else {
+                    id(aemet_status).publish_state("Municipio no encontrado");
+                  }
+          on_error:
+            then:
+              - lambda: 'id(aemet_status).publish_state("Error de catálogo");'
+
+interval:
+  # Procesa la segunda petición fuera del callback de la primera. Esto evita
+  # que ESPHome 2026.7.x duplique los argumentos response/body al generar C++.
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(aemet_data_pending);'
+          then:
+            - lambda: 'id(aemet_data_pending) = false;'
+            - lambda: 'id(aemet_status).publish_state("Descargando");'
+            - script.execute: fetch_aemet_data
+      - if:
+          condition:
+            lambda: 'return id(aemet_municipalities_pending);'
+          then:
+            - lambda: 'id(aemet_municipalities_pending) = false;'
+            - script.execute: search_aemet_municipalities
+      - if:
+          condition:
+            lambda: 'return id(aemet_municipality_refresh_pending);'
+          then:
+            - lambda: 'id(aemet_municipality_refresh_pending) = false;'
+            - script.execute: fetch_aemet_weather
+
+  # El periodo real se guarda en la entidad numérica configurable. Una
+  # comprobación corta permite aplicar los cambios sin reiniciar el ESP32.
+  - interval: 10s
+    startup_delay: 1min
+    then:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(aemet_update_interval_minutes).has_state()) return false;
+              const uint32_t configured_ms = static_cast<uint32_t>(
+                id(aemet_update_interval_minutes).state * 60000.0f);
+              return id(aemet_last_request_ms) == 0
+                || (millis() - id(aemet_last_request_ms)) >= configured_ms;
+          then:
+            - script.execute: fetch_aemet_weather
+
+wifi:
+  on_connect:
+    - delay: 15s
+    - script.execute: fetch_aemet_weather
+
+text_sensor:
+  - platform: template
+    id: aemet_current_municipality
+    name: "AEMET Municipio"
+    icon: mdi:map-marker
+    entity_category: diagnostic
+    lambda: 'return id(aemet_municipality_name);'
+    update_interval: 5s
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) != 2;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_provider_p4
+                  text: !lambda 'return x;'
+  - platform: template
+    id: aemet_status
+    name: "AEMET Estado"
+    icon: mdi:cloud-sync
+    entity_category: diagnostic
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(active_weather_provider) != 2;'
+            then:
+              - lvgl.label.update:
+                  id: lvgl_weather_provider_p4
+                  text: !lambda 'return id(aemet_municipality_name);'
+  - platform: template
+    id: aemet_last_update
+    name: "AEMET Última actualización"
+    icon: mdi:clock-check-outline
+    entity_category: diagnostic
+
+number:
+  - platform: template
+    id: aemet_update_interval_minutes
+    name: "Intervalo AEMET"
+    icon: mdi:timer-refresh-outline
+    unit_of_measurement: min
+    entity_category: config
+    min_value: 1
+    max_value: 1440
+    step: 1
+    initial_value: 5
+    restore_value: true
+    optimistic: true
+
+text:
+  # Entidades internas usadas como transporte por el panel web. No se
+  # restauran ni se publican en Home Assistant y se vacían al guardar.
+  - platform: template
+    id: aemet_api_key_input_1
+    name: "Clave API AEMET 1"
+    internal: true
+    mode: password
+    optimistic: true
+    min_length: 0
+    max_length: 200
+  - platform: template
+    id: aemet_api_key_input_2
+    name: "Clave API AEMET 2"
+    internal: true
+    mode: password
+    optimistic: true
+    min_length: 0
+    max_length: 200
+  - platform: template
+    id: aemet_municipality_search_input
+    name: "Buscar municipio AEMET"
+    internal: true
+    mode: text
+    optimistic: true
+    min_length: 0
+    max_length: 80
+
+button:
+  - platform: template
+    id: aemet_search_municipality
+    name: "Buscar municipio AEMET"
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              const size_t length = id(aemet_municipality_search_input).state.size();
+              return length >= 2 && length <= 80;
+          then:
+            - lambda: |-
+                id(aemet_municipality_query) = id(aemet_municipality_search_input).state;
+                id(aemet_municipality_search_input).publish_state("");
+            - script.execute: fetch_aemet_municipalities
+          else:
+            - lambda: |-
+                id(aemet_municipality_search_input).publish_state("");
+                id(aemet_status).publish_state("Localidad no válida");
+  - platform: template
+    id: aemet_save_api_key
+    name: "Guardar clave API AEMET"
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              const size_t length = id(aemet_api_key_input_1).state.size()
+                + id(aemet_api_key_input_2).state.size();
+              return length >= 50 && length <= 400;
+          then:
+            - lambda: |-
+                id(aemet_api_key_part_1) = id(aemet_api_key_input_1).state;
+                id(aemet_api_key_part_2) = id(aemet_api_key_input_2).state;
+                id(aemet_api_key_input_1).publish_state("");
+                id(aemet_api_key_input_2).publish_state("");
+                id(aemet_last_request_ms) = 0;
+                id(aemet_status).publish_state("Clave actualizada");
+            - script.execute: fetch_aemet_weather
+          else:
+            - lambda: |-
+                id(aemet_api_key_input_1).publish_state("");
+                id(aemet_api_key_input_2).publish_state("");
+                id(aemet_status).publish_state("Clave no válida");
+  - platform: template
+    id: aemet_refresh
+    name: "Actualizar AEMET"
+    icon: mdi:cloud-refresh
+    entity_category: diagnostic
+    on_press:
+      - script.execute: fetch_aemet_weather

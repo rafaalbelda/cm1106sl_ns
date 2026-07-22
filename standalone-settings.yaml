@@ -1,0 +1,71 @@
+# Ajustes modificables desde el panel web de las versiones standalone.
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      id: wifi_current_ssid
+      name: "WiFi SSID actual"
+      internal: true
+  - platform: template
+    id: wifi_config_status
+    name: "Estado configuración WiFi"
+    internal: true
+
+text:
+  # Entidades internas de transporte. Se vacían al terminar el intento para
+  # evitar conservar la contraseña en el estado de una entidad.
+  - platform: template
+    id: wifi_ssid_input
+    name: "Nuevo SSID WiFi"
+    internal: true
+    mode: text
+    optimistic: true
+    # Debe admitir el estado inicial vacío; el botón valida que el SSID tenga
+    # al menos un byte antes de ejecutar wifi.configure.
+    min_length: 0
+    max_length: 32
+  - platform: template
+    id: wifi_password_input
+    name: "Nueva contraseña WiFi"
+    internal: true
+    mode: password
+    optimistic: true
+    min_length: 0
+    max_length: 64
+
+button:
+  - platform: template
+    id: wifi_save_credentials
+    name: "Guardar configuración WiFi"
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              const size_t ssid_length = id(wifi_ssid_input).state.size();
+              const size_t password_length = id(wifi_password_input).state.size();
+              return ssid_length >= 1 && ssid_length <= 32
+                && (password_length == 0
+                  || (password_length >= 8 && password_length <= 64));
+          then:
+            - lambda: 'id(wifi_config_status).publish_state("Conectando");'
+            - wifi.configure:
+                ssid: !lambda 'return id(wifi_ssid_input).state;'
+                password: !lambda 'return id(wifi_password_input).state;'
+                save: true
+                timeout: 30s
+                on_connect:
+                  - lambda: |-
+                      id(wifi_ssid_input).publish_state("");
+                      id(wifi_password_input).publish_state("");
+                      id(wifi_config_status).publish_state("Conectado");
+                on_error:
+                  - lambda: |-
+                      id(wifi_ssid_input).publish_state("");
+                      id(wifi_password_input).publish_state("");
+                      id(wifi_config_status).publish_state("No se pudo conectar");
+          else:
+            - lambda: |-
+                id(wifi_ssid_input).publish_state("");
+                id(wifi_password_input).publish_state("");
+                id(wifi_config_status).publish_state("Credenciales no válidas");

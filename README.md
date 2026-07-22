@@ -1,6 +1,151 @@
 # cm1106sl_ns
 cm1106sl ns sensor in UART mode for ESPHome
 
+## Versiones standalone
+
+Las variantes standalone mantienen la pantalla LVGL y los sensores locales, pero
+no necesitan entidades meteorológicas de Home Assistant. El ESP32 consulta
+directamente la predicción horaria de AEMET y sirve un panel web autocontenido;
+el CSS y JavaScript se incluyen dentro del firmware y no se descargan de
+Internet. Los sensores locales y el panel siguen funcionando sin salida a
+Internet, pero la predicción necesita que el ESP32 pueda acceder por HTTPS a
+`opendata.aemet.es`.
+
+| Configuración | Orientación | Fuente meteorológica | Panel web local |
+| --- | --- | --- | --- |
+| `aqi32-w-standalone.yaml` | Horizontal | AEMET OpenData | Sí |
+| `aqi32-w-vertical-standalone.yaml` | Vertical | AEMET OpenData | Sí |
+
+La API nativa de ESPHome continúa habilitada para administración y OTA, pero
+Home Assistant es opcional para el funcionamiento diario de estas variantes.
+
+### Archivos necesarios
+
+Al copiar una configuración standalone al directorio de ESPHome hay que
+conservar también estos archivos y rutas relativas:
+
+```text
+aqi32-w-standalone.yaml                  # o la variante vertical
+aemet-weather.yaml
+standalone-settings.yaml
+web/airq32-dashboard.css
+web/airq32-dashboard.js
+secrets.yaml
+```
+
+`aemet-weather.yaml` implementa las dos peticiones requeridas por AEMET, procesa
+la respuesta y publica temperatura, sensación térmica, máxima, mínima,
+humedad, probabilidad de precipitación y estado del cielo. La consulta se hace
+al conectar el Wi-Fi, se repite inicialmente cada cinco minutos y también puede
+iniciarse con el botón **Actualizar AEMET** de la interfaz web o de ESPHome.
+El intervalo puede cambiarse entre 1 y 1440 minutos desde **Configuración →
+Intervalo de AEMET** y queda guardado entre reinicios.
+
+### Secrets y clave AEMET
+
+Además de los secrets habituales del dispositivo, las versiones standalone
+necesitan `aemet_api_key`:
+
+```yaml
+wifi_ssid: "MI_WIFI"
+wifi_password: "MI_PASSWORD"
+airq32_w_api_encryption_key: "CLAVE_API_ESPHOME"
+airq32_w_ota_password: "PASSWORD_OTA_Y_WEB"
+airq32_w_fallback_password: "PASSWORD_AP"
+aemet_api_key: "CLAVE_DE_AEMET_OPENDATA"
+```
+
+Puede copiarse la entrada de `aemet-secrets.example.yaml`. La clave se solicita
+en [AEMET OpenData](https://opendata.aemet.es/). El valor de `secrets.yaml` se
+usa como clave inicial al instalar el firmware. Después puede reemplazarse en
+**Configuración → Clave API de AEMET** dentro del panel web; el cambio queda
+guardado en la memoria flash, sobrevive a los reinicios e inicia una consulta
+meteorológica inmediatamente. Por seguridad, el formulario nunca muestra la
+clave actual.
+
+La clave no debe incorporarse al YAML principal, al repositorio, a capturas ni
+a registros compartidos. El panel usa HTTP local, por lo que la clave solo debe
+cambiarse desde una red de confianza. Si una clave se expone, debe revocarse y
+reemplazarse.
+
+### Compilar e instalar
+
+Desde el directorio que contiene todos los archivos anteriores:
+
+```bash
+esphome run aqi32-w-standalone.yaml
+```
+
+Para la orientación vertical:
+
+```bash
+esphome run aqi32-w-vertical-standalone.yaml
+```
+
+Ambas configuraciones usan el nombre de nodo `airq32-w`, por lo que debe
+instalarse solo una orientación cada vez. Para cambiar entre ellas hay que
+compilar e instalar el firmware correspondiente.
+
+### Panel web local
+
+Una vez conectado el dispositivo, el panel está disponible en:
+
+```text
+http://airq32-w.local/
+```
+
+También puede utilizarse `http://IP_DEL_ESP32/`. El usuario es `admin` y la
+contraseña es el valor de `airq32_w_ota_password`. La autenticación es Digest.
+El panel permite consultar los sensores interiores y la predicción AEMET,
+cambiar la página de la pantalla, ajustar el brillo y el offset de temperatura,
+cambiar la clave y el intervalo de AEMET, configurar una nueva conexión Wi-Fi y
+forzar una actualización meteorológica.
+
+### Cambiar la conexión Wi-Fi
+
+En **Configuración → Conexión Wi-Fi** se puede introducir un nuevo SSID y su
+contraseña. Al pulsar **Conectar y guardar**, el ESP32 intenta conectarse durante
+30 segundos y guarda las credenciales en memoria persistente. La página dejará
+de responder mientras cambia de red; después debe abrirse de nuevo mediante
+`http://airq32-w.local/` o usando la dirección asignada por el nuevo router.
+
+Si la conexión falla, el dispositivo conserva el punto de acceso de recuperación
+**Airq32-W Fallback Hotspot**. Tras aproximadamente un minuto sin conexión se
+puede acceder a `http://192.168.4.1/` para corregir las credenciales mediante el
+portal cautivo. Como la configuración se envía por HTTP local, debe realizarse
+únicamente desde una red de confianza.
+
+### Diagnóstico de AEMET
+
+Las entidades **AEMET Estado** y **AEMET Última actualización** aparecen en
+el panel web. El flujo normal es `Consultando`, `Descargando` y `Actualizado`.
+Si no aparecen datos, hay que revisar primero ese estado:
+
+- `Error de acceso`: la clave no es válida o AEMET ha rechazado la petición.
+- `Error de conexión`: el ESP32 no ha podido resolver el servidor o establecer
+  la conexión HTTPS.
+- `Error de descarga`: la URL temporal de datos devolvió un error HTTP.
+- `Límite AEMET (429)`: se hicieron varias consultas en poco tiempo; hay que
+  esperar al menos un minuto antes de volver a intentarlo.
+- `JSON: ...`: la respuesta no pudo procesarse; el texto posterior indica el
+  error concreto de ArduinoJson.
+- `Sin predicción`: AEMET respondió correctamente, pero no incluyó datos para
+  el municipio configurado.
+
+El municipio se configura mediante la sustitución `aemet_municipality` de
+`aemet-weather.yaml`; el valor incluido, `28903`, corresponde a Tres Cantos y se
+usa como valor inicial.
+
+La localidad puede cambiarse desde **Configuración → Localidad de AEMET**
+introduciendo su nombre oficial o el código INE de cinco cifras. El ESP32
+consulta `https://opendata.aemet.es/opendata/api/maestro/municipios`, recorre el
+catálogo sin cargarlo completo en memoria, guarda la coincidencia y actualiza la
+predicción. La búsqueda por nombre ignora mayúsculas, espacios, signos y los
+acentos españoles habituales. Si existen varios municipios con el mismo nombre,
+el panel solicita el código INE para evitar elegir una provincia incorrecta. La
+pantalla meteorológica muestra el nombre de la localidad seleccionada en lugar
+del nombre del proveedor AEMET.
+
 ## Control de la página LVGL desde Home Assistant
 
 La página mostrada en la pantalla puede controlarse desde Home Assistant mediante
