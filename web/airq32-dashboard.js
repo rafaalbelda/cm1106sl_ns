@@ -7,12 +7,12 @@
     { key: "co2", name: "CO2 Level", label: "CO₂", icon: "CO₂", tone: co2Tone },
     { key: "pm25", name: "PM2.5", label: "PM2.5", icon: "PM", tone: pm25Tone },
     { key: "pm10", name: "PM10", label: "PM10", icon: "PM", tone: pm10Tone },
-    { key: "voc", name: "VOC Index", label: "Índice VOC", icon: "VOC", tone: vocTone },
-    { key: "nox", name: "NOx Index", label: "Índice NOx", icon: "NOx", tone: noxTone },
+    { key: "pm1", name: "PM1.0", label: "PM1.0", icon: "PM", tone: pm10Tone },
+    { key: "pressure", name: "Presión", label: "Presión", icon: "hPa", tone: neutralTone },
     { key: "temp", name: "Temperatura", label: "Temperatura", icon: "°C", tone: neutralTone },
     { key: "humidity", name: "Humedad", label: "Humedad", icon: "%", tone: humidityTone },
-    { key: "pressure", name: "Presión", label: "Presión", icon: "hPa", tone: neutralTone },
-    { key: "pm1", name: "PM1.0", label: "PM1.0", icon: "PM", tone: neutralTone },
+    { key: "nox", name: "NOx Index", label: "Índice NOx", icon: "NOx", tone: noxTone },
+    { key: "voc", name: "VOC Index", label: "Índice VOC", icon: "VOC", tone: vocTone },
   ];
 
   const weatherEntities = [
