@@ -3,6 +3,7 @@
 
   const entities = [
     { key: "aqi", name: "European Air Quality Index", label: "AQI europeo", icon: "AQI", tone: aqiTone },
+    { key: "external_aqi", name: "AQI exterior Open-Meteo", label: "AQI exterior", icon: "EXT", tone: aqiTone, source: "Open-Meteo" },
     { key: "co2", name: "CO2 Level", label: "CO₂", icon: "CO₂", tone: co2Tone },
     { key: "pm25", name: "PM2.5", label: "PM2.5", icon: "PM", tone: pm25Tone },
     { key: "pm10", name: "PM10", label: "PM10", icon: "PM", tone: pm10Tone },
@@ -202,6 +203,17 @@
                 </div>
               </article>
 
+              <article class="setting-card external-aqi-card">
+                <div><span class="setting-icon">◎</span><strong>Ubicación del AQI exterior</strong><small>Coordenadas usadas para consultar AQI, PM10 y PM2.5 en Open-Meteo.</small></div>
+                <div class="wifi-fields">
+                  <div class="coordinate-row">
+                    <label><span>Latitud</span><input id="external-aqi-latitude" type="number" min="-90" max="90" step="0.0001"></label>
+                    <label><span>Longitud</span><input id="external-aqi-longitude" type="number" min="-180" max="180" step="0.0001"></label>
+                  </div>
+                  <button class="primary-button" id="save-external-aqi-location">Guardar y actualizar</button>
+                </div>
+              </article>
+
               <article class="setting-card wifi-card">
                 <div><span class="setting-icon">⌁</span><strong>Conexión Wi-Fi</strong><small>Red actual: <span id="current-wifi-ssid">cargando…</span></small></div>
                 <div class="wifi-fields">
@@ -219,6 +231,16 @@
               <article class="setting-card">
                 <div><span class="setting-icon">↻</span><strong>Predicción de AEMET</strong><small>Fuerza una actualización de la predicción oficial para la localidad configurada.</small></div>
                 <button class="primary-button" id="refresh-weather">Actualizar ahora</button>
+              </article>
+
+              <article class="setting-card firmware-card">
+                <div><span class="setting-icon">⬆</span><strong>Actualizar firmware</strong><small>Carga un firmware OTA compilado para este dispositivo. No uses archivos factory.bin.</small></div>
+                <div class="firmware-fields">
+                  <input id="firmware-file" type="file" accept=".bin,application/octet-stream">
+                  <progress id="firmware-progress" max="100" value="0" hidden></progress>
+                  <small id="firmware-status">Selecciona firmware.bin o firmware.ota.bin.</small>
+                  <button class="primary-button" id="upload-firmware" disabled>Cargar y reiniciar</button>
+                </div>
               </article>
             </div>
           </section>
@@ -273,7 +295,9 @@
     const card = document.getElementById(`card-${key}`);
     card.className = `sensor-card tone-${currentTone.level}`;
     document.getElementById(`value-${key}`).textContent = data.state || "--";
-    document.getElementById(`status-${key}`).textContent = entity.source === "AEMET" ? `AEMET · ${municipalityName}` : (entity.source || currentTone.text);
+    document.getElementById(`status-${key}`).textContent = entity.source === "AEMET"
+      ? `AEMET · ${municipalityName}`
+      : (entity.source ? `${entity.source} · ${currentTone.text}` : currentTone.text);
     document.getElementById("last-update").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     updateSummary();
   }
@@ -330,6 +354,8 @@
       getEntity("text_sensor", "WiFi SSID actual", true),
       getEntity("text_sensor", "Estado configuración WiFi", true),
       getEntity("text_sensor", "AEMET Municipio", true),
+      getEntity("number", "Latitud AQI exterior", true),
+      getEntity("number", "Longitud AQI exterior", true),
     ]);
     if (results[0].status === "fulfilled") document.getElementById("display-page").value = results[0].value.value;
     if (results[1].status === "fulfilled") document.getElementById("temperature-offset").value = results[1].value.value;
@@ -341,6 +367,8 @@
     if (results[4].status === "fulfilled") document.getElementById("current-wifi-ssid").textContent = results[4].value.state || "sin conexión";
     if (results[5].status === "fulfilled" && results[5].value.state) document.getElementById("wifi-config-status").textContent = results[5].value.state;
     if (results[6].status === "fulfilled") setMunicipality(results[6].value.state);
+    if (results[7].status === "fulfilled") document.getElementById("external-aqi-latitude").value = results[7].value.value;
+    if (results[8].status === "fulfilled") document.getElementById("external-aqi-longitude").value = results[8].value.value;
   }
 
   function connectEvents() {
@@ -457,6 +485,25 @@
       }
     });
 
+    document.getElementById("save-external-aqi-location").addEventListener("click", async () => {
+      const latitude = Number(document.getElementById("external-aqi-latitude").value);
+      const longitude = Number(document.getElementById("external-aqi-longitude").value);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+        return notify("La latitud debe estar entre -90 y 90", true);
+      }
+      if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        return notify("La longitud debe estar entre -180 y 180", true);
+      }
+      try {
+        await postEntity("number", "Latitud AQI exterior", "set", { value: latitude });
+        await postEntity("number", "Longitud AQI exterior", "set", { value: longitude });
+        await postEntity("button", "Actualizar AQI exterior", "press");
+        notify("Ubicación del AQI guardada; actualización iniciada");
+      } catch (_) {
+        notify("No se pudo guardar la ubicación del AQI", true);
+      }
+    });
+
     document.getElementById("save-wifi").addEventListener("click", async () => {
       const ssidInput = document.getElementById("wifi-ssid");
       const passwordInput = document.getElementById("wifi-password");
@@ -498,6 +545,77 @@
         await postEntity("button", "Actualizar AEMET", "press");
         notify("Actualización de AEMET iniciada");
       } catch (_) { notify("No se pudo iniciar la actualización", true); }
+    });
+
+    const firmwareInput = document.getElementById("firmware-file");
+    const firmwareButton = document.getElementById("upload-firmware");
+    const firmwareProgress = document.getElementById("firmware-progress");
+    const firmwareStatus = document.getElementById("firmware-status");
+
+    firmwareInput.addEventListener("change", () => {
+      const file = firmwareInput.files[0];
+      firmwareButton.disabled = !file;
+      firmwareStatus.textContent = file
+        ? `${file.name} · ${(file.size / 1048576).toFixed(2)} MB`
+        : "Selecciona firmware.bin o firmware.ota.bin.";
+    });
+
+    firmwareButton.addEventListener("click", () => {
+      const file = firmwareInput.files[0];
+      if (!file) return notify("Selecciona un archivo de firmware", true);
+      const filename = file.name.toLowerCase();
+      if (!filename.endsWith(".bin")) return notify("El firmware debe ser un archivo .bin", true);
+      if (filename.includes("factory")) return notify("No uses firmware.factory.bin para una actualización OTA", true);
+      if (!window.confirm(`Se cargará ${file.name} y el dispositivo se reiniciará. ¿Continuar?`)) return;
+
+      firmwareInput.disabled = true;
+      firmwareButton.disabled = true;
+      firmwareProgress.hidden = false;
+      firmwareProgress.value = 0;
+      firmwareStatus.textContent = "Preparando la carga…";
+
+      const form = new FormData();
+      form.append("update", file, file.name);
+      const request = new XMLHttpRequest();
+      let uploadComplete = false;
+      request.open("POST", "/update", true);
+      request.upload.addEventListener("progress", (event) => {
+        if (!event.lengthComputable) return;
+        const percentage = Math.min(100, Math.round(event.loaded * 100 / event.total));
+        firmwareProgress.value = percentage;
+        firmwareStatus.textContent = `Cargando firmware… ${percentage}%`;
+        uploadComplete = percentage === 100;
+      });
+      request.addEventListener("load", () => {
+        const responseText = String(request.responseText || "");
+        const successful = request.status === 200
+          && /update successful/i.test(responseText)
+          && !/failed/i.test(responseText);
+        if (successful) {
+          firmwareProgress.value = 100;
+          firmwareStatus.textContent = "Firmware instalado. Reiniciando el dispositivo…";
+          notify("Firmware instalado; el dispositivo se está reiniciando");
+          setTimeout(() => location.reload(), 15000);
+          return;
+        }
+        firmwareStatus.textContent = "La actualización fue rechazada por el dispositivo.";
+        firmwareInput.disabled = false;
+        firmwareButton.disabled = false;
+        notify("No se pudo instalar el firmware", true);
+      });
+      request.addEventListener("error", () => {
+        if (uploadComplete) {
+          firmwareStatus.textContent = "Carga enviada; esperando que el dispositivo reinicie…";
+          notify("Carga enviada; comprobando el reinicio");
+          setTimeout(() => location.reload(), 15000);
+          return;
+        }
+        firmwareStatus.textContent = "La conexión se interrumpió antes de completar la carga.";
+        firmwareInput.disabled = false;
+        firmwareButton.disabled = false;
+        notify("La carga del firmware se interrumpió", true);
+      });
+      request.send(form);
     });
   }
 

@@ -102,6 +102,18 @@ input[type="range"] { flex: 1; accent-color: var(--accent); }
 .secret-row button:hover { background: #1d442d; }
 .wifi-fields { display: grid; gap: 10px; }
 .wifi-fields > small { margin-left: 0; }
+.coordinate-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.coordinate-row label { display: grid; gap: 6px; }
+.coordinate-row label span { color: var(--muted); font-size: 12px; }
+.firmware-fields { display: grid; gap: 10px; }
+.firmware-fields > small { margin-left: 0; }
+.firmware-fields input[type="file"] { width: 100%; color: var(--muted); font-size: 12px; }
+.firmware-fields input[type="file"]::file-selector-button { height: 38px; margin-right: 10px; padding: 0 13px; border: 1px solid #35434b; border-radius: 9px; color: var(--text); background: #0a0f12; cursor: pointer; }
+.firmware-fields progress { width: 100%; height: 9px; overflow: hidden; border: 0; border-radius: 8px; accent-color: var(--accent); }
+.firmware-fields progress::-webkit-progress-bar { background: #0a0f12; }
+.firmware-fields progress::-webkit-progress-value { background: var(--accent); }
+.firmware-fields progress::-moz-progress-bar { background: var(--accent); }
+.primary-button:disabled { opacity: .45; cursor: not-allowed; }
 .primary-button { width: 100%; height: 44px; border: 1px solid #2dd36f55; border-radius: 10px; color: #d6f9e3; background: #173323; cursor: pointer; }
 .primary-button:hover { background: #1d442d; }
 .info-card dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; }
@@ -132,6 +144,7 @@ input[type="range"] { flex: 1; accent-color: var(--accent); }
   .section-heading h1 { font-size: 32px; }
   .number-row, .secret-row { flex-wrap: wrap; }
   .number-row input, .secret-row input { flex: 1; min-width: 140px; }
+  .coordinate-row { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

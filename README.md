@@ -27,6 +27,7 @@ conservar también estos archivos y rutas relativas:
 ```text
 aqi32-w-standalone.yaml                  # o la variante vertical
 aemet-weather.yaml
+external-air-quality.yaml
 standalone-settings.yaml
 web/airq32-dashboard.css
 web/airq32-dashboard.js
@@ -145,6 +146,39 @@ acentos españoles habituales. Si existen varios municipios con el mismo nombre,
 el panel solicita el código INE para evitar elegir una provincia incorrecta. La
 pantalla meteorológica muestra el nombre de la localidad seleccionada en lugar
 del nombre del proveedor AEMET.
+
+### Calidad del aire exterior en standalone
+
+`external-air-quality.yaml` consulta directamente la API de calidad del aire de
+Open-Meteo y publica el AQI europeo, PM10 y PM2.5 usados por la página de
+comparación. La primera consulta se realiza 20 segundos después del arranque y
+se repite cada 15 minutos. También están disponibles las entidades **AQI
+exterior Estado**, **AQI exterior Última actualización** y el botón **Actualizar
+AQI exterior**.
+
+La ubicación inicial es Tres Cantos. Puede cambiarse desde **Configuración →
+Ubicación del AQI exterior** introduciendo latitud y longitud; ambos valores
+quedan guardados entre reinicios. Las sustituciones `external_aqi_latitude` y
+`external_aqi_longitude` definen los valores iniciales y
+`external_aqi_update_interval` configura el intervalo. La presentación conserva
+deliberadamente los tramos `25/50/75/100` utilizados por el resto de la pantalla.
+
+Los valores son estimaciones del modelo CAMS europeo distribuidas por
+[Open-Meteo](https://open-meteo.com/en/docs/air-quality-api), no mediciones de
+una estación física. Datos: CAMS ENSEMBLE, procesados por Open-Meteo.
+
+### Actualización local del firmware
+
+Las variantes standalone permiten instalar firmware desde **Configuración →
+Actualizar firmware**. Debe seleccionarse el archivo `firmware.bin` o
+`firmware.ota.bin` generado por ESPHome para este dispositivo. La página muestra
+el progreso y el ESP32 se reinicia automáticamente cuando termina. No debe
+usarse `firmware.factory.bin`, que está destinado a la primera instalación.
+
+La actualización utiliza el endpoint OTA del servidor web y queda protegida por
+las mismas credenciales configuradas en `web_server.auth`. Debe utilizarse solo
+desde una red local de confianza y nunca debe interrumpirse la alimentación
+durante la escritura.
 
 ## Control de la página LVGL desde Home Assistant
 

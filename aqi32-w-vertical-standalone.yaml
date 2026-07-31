@@ -1,5 +1,6 @@
 packages:
   aemet_weather: !include aemet-weather.yaml
+  external_air_quality: !include external-air-quality.yaml
   standalone_settings: !include standalone-settings.yaml
 
 esphome:
@@ -68,11 +69,11 @@ web_server:
   js_url: ""
   js_include: web/airq32-dashboard.js
   log: false
-  ota: false
 
 ota:
   - platform: esphome
     password: !secret airq32_w_ota_password
+  - platform: web_server
 
 wifi:
   ssid: !secret wifi_ssid
@@ -942,6 +943,9 @@ sensor:
 
   - platform: template
     id: ha_tres_cantos_aqi_europeo
+    name: "AQI exterior Open-Meteo"
+    icon: mdi:weather-hazy
+    accuracy_decimals: 0
     on_value:
       then:
         - lvgl.label.update:
@@ -3470,14 +3474,14 @@ lvgl:
                               align: CENTER
                               text_font: font16
                               text_color: 0x2DD36F
-                              text: "L"
+                              text: "S"
                     - label:
                         id: lvgl_aqi_compare_local_title
                         x: 42
                         y: 14
                         text_font: font16
                         text_color: 0x2DD36F
-                        text: "LOCAL"
+                        text: "SENSOR"
                     - label:
                         x: 42
                         y: 37
@@ -3536,14 +3540,14 @@ lvgl:
                               align: CENTER
                               text_font: font16
                               text_color: 0x2DD36F
-                              text: "TC"
+                              text: "L"
                     - label:
                         id: lvgl_aqi_compare_tc_title
                         x: 42
-                        y: 15
-                        text_font: font10
+                        y: 14
+                        text_font: font16
                         text_color: 0x2DD36F
-                        text: "TRES CANTOS"
+                        text: "LOCAL"
                     - label:
                         x: 42
                         y: 37
@@ -3588,7 +3592,7 @@ lvgl:
                         y: 10
                         text_font: font10
                         text_color: 0x8FC8FF
-                        text: "LOCAL"
+                        text: "SENSOR"
                     - label:
                         x: 6
                         y: 30
@@ -3630,7 +3634,7 @@ lvgl:
                         y: 10
                         text_font: font10
                         text_color: 0x8FC8FF
-                        text: "LOCAL"
+                        text: "SENSOR"
                     - label:
                         x: 6
                         y: 30
@@ -3672,7 +3676,7 @@ lvgl:
                         y: 10
                         text_font: font10
                         text_color: 0xF8D64E
-                        text: "TC"
+                        text: "LOCAL"
                     - label:
                         x: 6
                         y: 30
@@ -3714,7 +3718,7 @@ lvgl:
                         y: 10
                         text_font: font10
                         text_color: 0xF8D64E
-                        text: "TC"
+                        text: "LOCAL"
                     - label:
                         x: 6
                         y: 30

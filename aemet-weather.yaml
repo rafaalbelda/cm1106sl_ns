@@ -120,8 +120,16 @@ script:
                 on_error:
                   then:
                     - lambda: |-
+                        ESP_LOGW("aemet", "Error de conexión en la consulta inicial");
                         id(aemet_data_pending) = false;
                         id(aemet_status).publish_state("Error de conexión");
+          else:
+            - if:
+                condition:
+                  not:
+                    wifi.connected:
+                then:
+                  - lambda: 'ESP_LOGW("aemet", "No se consulta AEMET: Wi-Fi no conectado");'
 
   # Segunda petición: descarga y procesa la predicción horaria.
   # Debe estar separada de la primera para evitar parámetros response/body
@@ -326,7 +334,9 @@ script:
                            id(aemet_municipality_name).c_str());
           on_error:
             then:
-              - lambda: 'id(aemet_status).publish_state("Error de conexión");'
+              - lambda: |-
+                  ESP_LOGW("aemet", "Error de conexión al descargar la predicción");
+                  id(aemet_status).publish_state("Error de conexión");
 
   # Obtiene la URL temporal del catálogo oficial de municipios.
   - id: fetch_aemet_municipalities

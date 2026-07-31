@@ -1,0 +1,141 @@
+# Calidad del aire exterior para las versiones standalone.
+# Open-Meteo entrega AQI europeo, PM10 y PM2.5 en una sola petición.
+substitutions:
+  external_aqi_latitude: "40.5991"
+  external_aqi_longitude: "-3.7097"
+  external_aqi_update_interval: "15min"
+
+script:
+  - id: fetch_external_air_quality
+    mode: single
+    then:
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - lambda: 'id(external_aqi_status).publish_state("Consultando");'
+            - http_request.get:
+                url: !lambda |-
+                  static std::string url;
+                  char buffer[256];
+                  snprintf(buffer, sizeof(buffer),
+                           "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.6f&longitude=%.6f&current=european_aqi,pm10,pm2_5&timezone=auto",
+                           id(external_aqi_latitude_number).state,
+                           id(external_aqi_longitude_number).state);
+                  url = buffer;
+                  return url.c_str();
+                capture_response: true
+                max_response_buffer_size: 2048
+                on_response:
+                  then:
+                    - lambda: |-
+                        if (response->status_code != 200) {
+                          ESP_LOGW("external_aqi", "Error en la consulta: HTTP %d",
+                                   response->status_code);
+                          id(external_aqi_status).publish_state("Error de acceso");
+                          return;
+                        }
+
+                        const bool parsed = json::parse_json(body, [](JsonObject root) -> bool {
+                          JsonObject current = root["current"].as<JsonObject>();
+                          if (current.isNull()
+                              || current["european_aqi"].isNull()
+                              || current["pm10"].isNull()
+                              || current["pm2_5"].isNull()) {
+                            return false;
+                          }
+
+                          const float aqi = current["european_aqi"].as<float>();
+                          const float pm10 = current["pm10"].as<float>();
+                          const float pm2_5 = current["pm2_5"].as<float>();
+                          if (!std::isfinite(aqi) || !std::isfinite(pm10)
+                              || !std::isfinite(pm2_5)) {
+                            return false;
+                          }
+
+                          id(ha_tres_cantos_aqi_europeo).publish_state(aqi);
+                          id(ha_tres_cantos_pm10).publish_state(pm10);
+                          id(ha_tres_cantos_pm2_5).publish_state(pm2_5);
+                          return true;
+                        });
+
+                        if (!parsed) {
+                          ESP_LOGW("external_aqi", "Respuesta JSON no válida o incompleta");
+                          id(external_aqi_status).publish_state("Respuesta no válida");
+                          return;
+                        }
+
+                        id(external_aqi_status).publish_state("Actualizado");
+                        const auto now = id(sntp_time).now();
+                        if (now.is_valid()) {
+                          char updated_at[24];
+                          snprintf(updated_at, sizeof(updated_at),
+                                   "%02d/%02d/%04d %02d:%02d",
+                                   now.day_of_month, now.month, now.year,
+                                   now.hour, now.minute);
+                          id(external_aqi_last_update).publish_state(updated_at);
+                        }
+                        ESP_LOGI("external_aqi", "Actualizado: AQI %.0f, PM10 %.1f, PM2.5 %.1f",
+                                 id(ha_tres_cantos_aqi_europeo).state,
+                                 id(ha_tres_cantos_pm10).state,
+                                 id(ha_tres_cantos_pm2_5).state);
+                on_error:
+                  then:
+                    - lambda: |-
+                        ESP_LOGW("external_aqi", "Error de conexión con Open-Meteo");
+                        id(external_aqi_status).publish_state("Error de conexión");
+          else:
+            - lambda: |-
+                ESP_LOGW("external_aqi", "No se consulta la calidad del aire: Wi-Fi no conectado");
+                id(external_aqi_status).publish_state("Sin conexión WiFi");
+
+interval:
+  - interval: ${external_aqi_update_interval}
+    startup_delay: 20s
+    then:
+      - script.execute: fetch_external_air_quality
+
+text_sensor:
+  - platform: template
+    id: external_aqi_status
+    name: "AQI exterior Estado"
+    icon: mdi:cloud-refresh
+  - platform: template
+    id: external_aqi_last_update
+    name: "AQI exterior Última actualización"
+    icon: mdi:clock-check-outline
+
+number:
+  - platform: template
+    id: external_aqi_latitude_number
+    name: "Latitud AQI exterior"
+    icon: mdi:latitude
+    entity_category: config
+    min_value: -90
+    max_value: 90
+    step: 0.0001
+    initial_value: ${external_aqi_latitude}
+    restore_value: true
+    optimistic: true
+    mode: box
+  - platform: template
+    id: external_aqi_longitude_number
+    name: "Longitud AQI exterior"
+    icon: mdi:longitude
+    entity_category: config
+    min_value: -180
+    max_value: 180
+    step: 0.0001
+    initial_value: ${external_aqi_longitude}
+    restore_value: true
+    optimistic: true
+    mode: box
+
+button:
+  - platform: template
+    id: external_aqi_refresh
+    name: "Actualizar AQI exterior"
+    icon: mdi:refresh
+    entity_category: diagnostic
+    on_press:
+      - script.execute: fetch_external_air_quality
